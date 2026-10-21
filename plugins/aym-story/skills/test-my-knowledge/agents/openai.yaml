@@ -1,0 +1,4 @@
+interface:
+  display_name: "Test My Knowledge"
+  short_description: "Source-checked practice quiz with a retest of weak areas"
+  default_prompt: "Use $test-my-knowledge to quiz me on this source with scenario questions, explanations, a score and a retest of what I miss."

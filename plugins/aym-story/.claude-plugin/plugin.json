@@ -1,0 +1,11 @@
+{
+  "name": "aym-story",
+  "version": "0.4.0-rc.1",
+  "description": "Turn finished work into understanding and stories: plain-English explanations, practice quizzes, blog articles and portfolio cases.",
+  "author": {
+    "name": "Ayman Abdalla"
+  },
+  "repository": "https://github.com/AymAbdalla/agent-skills",
+  "license": "MIT",
+  "skills": "./skills/"
+}

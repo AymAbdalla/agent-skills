@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": ["/ABSOLUTE/PATH/TO/aym-skills/setup/always-use/claude-hook/work_my_way_nudge.py"],
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

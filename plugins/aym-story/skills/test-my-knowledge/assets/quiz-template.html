@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Test My Knowledge</title>
+<style>
+:root{color-scheme:light;--ink:#17252d;--muted:#526571;--line:#d6e0e5;--blue:#155e91;--paper:#f7fafb;--good:#21694c;--goodbg:#f3faf6;--amber:#8b4c0d;--amberbg:#fff9f1}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.6;font-size:18px}
+main{max-width:920px;margin:auto;padding:50px 28px 70px}h1{font-size:clamp(30px,5vw,46px);line-height:1.3;letter-spacing:-.03em;margin:10px 0 18px}h2{font-size:24px;line-height:1.3;margin:0 0 12px}p{margin:0 0 14px}
+.lead{font-size:20px}.quiet{color:var(--muted);font-size:15px}.block{margin-top:32px}.panel{background:#fff;border:1px solid var(--line);border-radius:20px;padding:25px}
+.head-row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px}.pill{border-radius:100px;padding:3px 10px;background:#e7eef3;font-size:12px;font-weight:700;color:var(--muted)}
+ol.objectives{padding-left:24px}ol.objectives li{margin-bottom:8px}.oid{font-weight:700;color:var(--muted);font-size:14px;margin-right:6px}
+fieldset{border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:0 0 18px;min-width:0}legend{font-weight:750;font-size:15px;color:var(--muted);padding:0 6px}
+.scenario{margin-bottom:8px}.prompt{font-weight:650}
+label.option{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin-top:9px;cursor:pointer;background:#fff;overflow-wrap:anywhere}
+label.option input{margin-top:6px;flex:none;width:18px;height:18px}label.option.correct{border-color:var(--good);background:var(--goodbg)}label.option.chosen-wrong{border-color:var(--amber);background:var(--amberbg)}
+.letter{font-weight:700;min-width:1.4em}.feedback{margin-top:14px;padding:13px 16px;border-radius:10px;background:#edf5fb;font-size:16px}.feedback p:last-child{margin-bottom:0}.verdict{font-weight:750}
+.verdict.right{color:var(--good)}.verdict.wrong{color:var(--amber)}.source{font-size:14px;color:var(--muted);overflow-wrap:anywhere}
+.tools{display:flex;gap:10px;flex-wrap:wrap;margin:20px 0 4px}button{font:inherit;font-weight:650;font-size:15px;padding:11px 16px;border:1px solid var(--line);border-radius:10px;background:white;color:var(--ink);cursor:pointer;min-height:46px}
+button.primary{background:var(--blue);color:white;border-color:var(--blue)}button:disabled{opacity:.55;cursor:default}button:focus-visible,input:focus-visible{outline:3px solid #e1a13f;outline-offset:3px}
+.results{margin-top:24px;padding:23px;background:#eaf3f9;border-radius:15px}.score{font-size:22px;font-weight:750}ul.status{list-style:none;padding:0;margin:12px 0}ul.status li{padding:9px 0;border-bottom:1px solid var(--line)}
+.tag{display:inline-block;font-size:13px;font-weight:750;border-radius:100px;padding:2px 10px;margin-right:8px}.tag.solid{background:var(--goodbg);color:var(--good);border:1px solid var(--good)}.tag.review{background:var(--amberbg);color:var(--amber);border:1px solid var(--amber)}
+.flags{border-left:4px solid var(--amber);background:var(--amberbg);padding:14px 18px;border-radius:8px}.flags ul{margin:6px 0 0;padding-left:20px}
+footer{font-size:13px;color:var(--muted);margin-top:35px}.hidden{display:none}noscript p{background:#fff4dc;padding:16px;border-radius:10px}
+@media(max-width:650px){main{padding:28px 16px 45px}.lead{font-size:18px}.panel{padding:16px}fieldset{padding:14px}.tools button{flex:1 1 140px}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<p class="pill" id="kind">Practice quiz</p>
+<h1 id="title">Test my knowledge</h1>
+<p class="lead" id="topic"></p>
+<p class="quiet">This quiz is for your own practice. Your score shows how this quiz went. It does not certify a skill level.</p>
+<p class="quiet">Built from: <span id="sources"></span></p>
+</header>
+
+<section id="flags" class="block flags hidden" aria-labelledby="flags-heading">
+<h2 id="flags-heading">Source problems found</h2>
+<p class="quiet">These parts of the source look wrong or disagree with each other. The quiz does not score them.</p>
+<ul id="flag-list"></ul>
+</section>
+
+<section class="block" aria-labelledby="objectives-heading">
+<h2 id="objectives-heading">What you will practice</h2>
+<ol class="objectives" id="objectives"></ol>
+</section>
+
+<section class="block panel" aria-labelledby="mode-heading">
+<div class="head-row"><h2 id="mode-heading">Questions</h2><span class="pill" id="mode-pill">Main quiz</span></div>
+<p class="quiet" id="progress" aria-live="polite"></p>
+<form id="quiz" onsubmit="return false"></form>
+<div class="tools">
+<button type="button" id="check" class="primary">Check my answers</button>
+<button type="button" id="retest" disabled>Retest weak areas</button>
+<button type="button" id="reset">Start over</button>
+</div>
+<div id="results" class="results hidden" role="status" aria-live="polite">
+<h2 id="results-heading">Your result</h2>
+<p class="score"><span id="score-points">0</span> of <span id="score-total">0</span> points</p>
+<p class="quiet" id="score-rule"></p>
+<ul class="status" id="objective-status"></ul>
+<p id="next-step"></p>
+</div>
+<noscript><p>This quiz needs JavaScript to check answers. The answer key file next to this page lists every question, answer and source.</p></noscript>
+</section>
+<footer>Self-contained page: the quiz data, styles and script live in this file. It makes no network requests. To change it, edit the quiz JSON saved beside it and rebuild.</footer>
+</main>
+<script type="application/json" id="quiz-data">/*QUIZ_DATA*/null</script>
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const data=JSON.parse($('quiz-data').textContent);
+const scoring=data.scoring;
+const objectives=new Map(data.objectives.map(o=>[o.id,o]));
+const sources=new Map(data.sources.map(s=>[s.id,s]));
+let mode='main',checked=false,weak=[];
+
+function el(tag,props,text){const node=document.createElement(tag);if(props)for(const [k,v] of Object.entries(props)){if(k==='class')node.className=v;else node.setAttribute(k,v);}if(text!==undefined)node.textContent=text;return node;}
+function setOf(q){return q.set||'main';}
+function pointer(item){const s=sources.get(item.source);const span=String(item.lines);let t=`Source: ${s?s.path:item.source}, ${span.includes('-')?'lines':'line'} ${span}`;if(item.quote)t+=`: “${item.quote}”`;return t;}
+function visible(){return mode==='main'?data.questions.filter(q=>setOf(q)==='main'):data.questions.filter(q=>setOf(q)==='retest'&&weak.includes(q.objective));}
+
+function renderHeader(){
+  document.title=`${data.title} · Test My Knowledge`;$('title').textContent=data.title;
+  $('topic').textContent=data.topic||'';
+  if(data.retest_of)$('kind').textContent=`Retest quiz · follows: ${data.retest_of}`;
+  $('sources').textContent=data.sources.map(s=>s.path).join(', ');
+  const ol=$('objectives');ol.replaceChildren();
+  for(const o of data.objectives){const li=el('li');li.append(el('span',{class:'oid'},o.id),document.createTextNode(o.statement));ol.append(li);}
+  const flags=data.flags||[];
+  if(flags.length){$('flags').classList.remove('hidden');const ul=$('flag-list');ul.replaceChildren();for(const f of flags){const li=el('li',null,f.note);li.append(el('div',{class:'source'},pointer(f)));ul.append(li);}}
+}
+
+function renderQuestions(){
+  const form=$('quiz');form.replaceChildren();
+  visible().forEach((q,i)=>{
+    const fs=el('fieldset',{class:'question','data-qid':q.id,'data-objective':q.objective,'data-set':setOf(q)});
+    fs.append(el('legend',null,`Question ${i+1} · ${q.objective}`));
+    fs.append(el('p',{class:'scenario'},q.scenario),el('p',{class:'prompt'},q.prompt));
+    for(const o of q.options){
+      const label=el('label',{class:'option','data-option':o.id});
+      const input=el('input',{type:'radio',name:`q-${q.id}`,value:o.id});
+      input.addEventListener('change',progress);
+      label.append(input,el('span',{class:'letter'},`${o.id}.`),el('span',null,o.text));
+      fs.append(label);
+    }
+    fs.append(el('div',{class:'feedback hidden'}));
+    form.append(fs);
+  });
+  $('mode-heading').textContent=mode==='main'?'Questions':'Retest: your weak areas';
+  $('mode-pill').textContent=mode==='main'?'Main quiz':'Retest';
+  progress();
+}
+
+function chosen(q){const c=document.querySelector(`input[name="q-${CSS.escape(q.id)}"]:checked`);return c?c.value:null;}
+function progress(){const qs=visible();const n=qs.filter(chosen).length;$('progress').textContent=checked?`${qs.length} questions checked.`:`${n} of ${qs.length} answered. Unanswered questions count as incorrect.`;}
+
+function check(){
+  if(checked)return;checked=true;
+  const qs=visible();let right=0;const byObjective=new Map();
+  for(const q of qs){
+    const pick=chosen(q);const ok=pick===q.answer;if(ok)right++;
+    const tally=byObjective.get(q.objective)||{right:0,total:0};tally.total++;if(ok)tally.right++;byObjective.set(q.objective,tally);
+    const fs=document.querySelector(`fieldset[data-qid="${CSS.escape(q.id)}"]`);
+    fs.dataset.result=ok?'correct':(pick?'incorrect':'unanswered');
+    fs.querySelectorAll('input').forEach(input=>{input.disabled=true;});
+    fs.querySelectorAll('label.option').forEach(label=>{const id=label.dataset.option;if(id===q.answer)label.classList.add('correct');else if(id===pick)label.classList.add('chosen-wrong');});
+    const box=fs.querySelector('.feedback');box.replaceChildren();box.classList.remove('hidden');
+    box.append(el('p',{class:`verdict ${ok?'right':'wrong'}`},ok?'Correct.':(pick?'Not quite.':'Not answered.')));
+    if(pick&&!ok){const o=q.options.find(x=>x.id===pick);box.append(el('p',null,`Why ${pick} does not fit: ${o.why}`));}
+    const answer=q.options.find(x=>x.id===q.answer);
+    box.append(el('p',null,`Answer: ${q.answer}. ${answer.text}`),el('p',null,q.explanation));
+    for(const item of q.evidence)box.append(el('p',{class:'source'},pointer(item)));
+  }
+  const points=right*scoring.points_per_question,total=qs.length*scoring.points_per_question;
+  $('score-points').textContent=points;$('score-total').textContent=total;
+  $('results-heading').textContent=mode==='main'?'Your result':'Your retest result';
+  $('score-rule').textContent=`${scoring.points_per_question} point${scoring.points_per_question===1?'':'s'} per question. ${scoring.weak_below>=1?'An objective needs review when any of its questions is missed.':`An objective needs review when fewer than ${Math.round(scoring.weak_below*100)}% of its questions are correct.`}`;
+  const list=$('objective-status');list.replaceChildren();const nowWeak=[];
+  for(const [oid,t] of byObjective){
+    const isWeak=t.right/t.total<scoring.weak_below;if(isWeak)nowWeak.push(oid);
+    const li=el('li',{'data-objective-status':oid,'data-state':isWeak?'review':'solid'});
+    li.append(el('span',{class:`tag ${isWeak?'review':'solid'}`},isWeak?'Review this':'Solid'),document.createTextNode(`${oid}: ${objectives.get(oid).statement} (${t.right} of ${t.total} correct)`));
+    list.append(li);
+  }
+  const reserve=data.questions.filter(q=>setOf(q)==='retest'&&nowWeak.includes(q.objective));
+  if(mode==='main'){weak=nowWeak;$('retest').disabled=reserve.length===0;}
+  else $('retest').disabled=true;
+  let next;
+  if(!nowWeak.length)next='Every objective in this round is solid.';
+  else{
+    const covered=[...new Set(reserve.map(q=>q.objective))];const uncovered=nowWeak.filter(o=>!covered.includes(o));
+    const parts=[];
+    if(mode==='main'&&covered.length)parts.push(`Choose "Retest weak areas" for new questions on ${covered.join(', ')}.`);
+    const rest=mode==='main'?uncovered:nowWeak;
+    if(rest.length)parts.push(`For more practice on ${rest.join(', ')}, ask for a new retest quiz.`);
+    next=parts.join(' ');
+  }
+  $('next-step').textContent=next;
+  $('results').classList.remove('hidden');$('check').disabled=true;progress();
+}
+
+function retest(){if(!weak.length)return;mode='retest';checked=false;$('results').classList.add('hidden');$('check').disabled=false;$('retest').disabled=true;renderQuestions();}
+function reset(){mode='main';checked=false;weak=[];$('results').classList.add('hidden');$('objective-status').replaceChildren();$('score-points').textContent='0';$('score-total').textContent='0';$('check').disabled=false;$('retest').disabled=true;renderQuestions();}
+
+$('check').addEventListener('click',check);$('retest').addEventListener('click',retest);$('reset').addEventListener('click',reset);
+renderHeader();renderQuestions();
+})();
+</script>
+</body>
+</html>

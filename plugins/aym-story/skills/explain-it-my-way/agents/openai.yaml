@@ -1,0 +1,4 @@
+interface:
+  display_name: "Explain It My Way"
+  short_description: "Plain English, visuals, terms, and professional practice"
+  default_prompt: "Use $explain-it-my-way to explain this in fifth-grade plain English, show how it works, teach the industry terms, and compare our approach with sourced professional practice."

@@ -1,0 +1,11 @@
+{
+  "name": "aym-lab",
+  "version": "0.4.0-rc.1",
+  "description": "Build and improve agent skills: dissect how a system works, build a skill, pressure-test it, and capture lessons from finished work.",
+  "author": {
+    "name": "Ayman Abdalla"
+  },
+  "repository": "https://github.com/AymAbdalla/agent-skills",
+  "license": "MIT",
+  "skills": "./skills/"
+}

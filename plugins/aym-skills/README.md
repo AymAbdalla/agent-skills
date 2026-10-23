@@ -37,7 +37,7 @@ The shared rules every skill follows (the stop card, honest result states, worki
 
 ## Companion plugins
 
-From the same marketplace: `aym-story` (explanations, quizzes, blog articles, portfolio cases), `aym-lab` (dissect systems, build and test skills) and `aym-gtm` (GTM engineering on plain files). `work-my-way` sends skill work to `aym-lab` when it is installed and does the work directly when it is not.
+From the same marketplace: `aym-story` (explanations, quizzes, blog articles, portfolio cases) and `aym-lab` (dissect systems, build and test skills). `work-my-way` sends skill work to `aym-lab` when it is installed and does the work directly when it is not.
 
 To make `work-my-way` the default for every session, see `setup/always-use/` in the repository.
 

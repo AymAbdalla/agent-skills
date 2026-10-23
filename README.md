@@ -1,13 +1,12 @@
 # agent-skills
 
-Four plugins of agent skills for Claude Code and Codex. Describe the job in plain words, and the skills plan, build, check and ship it one phase at a time, stopping after each phase so you stay in charge. Nothing commits, pushes, deploys, installs or sends unless you ask for that action.
+Three plugins of agent skills for Claude Code and Codex. Describe the job in plain words, and the skills plan, build, check and ship it one phase at a time, stopping after each phase so you stay in charge. Nothing commits, pushes, deploys, installs or sends unless you ask for that action.
 
 | Plugin | What it is for | Skills |
 | --- | --- | --- |
 | [aym-skills](plugins/aym-skills/) | The daily build loop | `work-my-way`, `plan-this`, `implement-this`, `debug-this`, `check-this`, `ship-this`, `handoff-this` |
 | [aym-story](plugins/aym-story/) | Explanations, quizzes and write-ups | `explain-it-my-way`, `test-my-knowledge`, `blog-it`, `create-my-portfolio` |
 | [aym-lab](plugins/aym-lab/) | Building and testing skills | `dissect-this`, `build-skill`, `pressure-test-my-skills`, `learn-from-work`, `install-check` |
-| [aym-gtm](plugins/aym-gtm/) | GTM engineering on plain files | `icp-define`, `data-quality`, `account-book`, `signal-score`, `play-build`, `outreach-draft`, `daily-plan`, `crm-sync`, `funnel-review`, `motion-map` |
 
 Each plugin folder has its own README with what every skill does.
 
@@ -20,10 +19,9 @@ Claude Code:
 /plugin install aym-skills@aymabdalla
 /plugin install aym-story@aymabdalla
 /plugin install aym-lab@aymabdalla
-/plugin install aym-gtm@aymabdalla
 ```
 
-Install only the plugins you want. On Claude Code 2.1.275 or later, one line per plugin also works, for example `/plugin install aym-skills --marketplace AymAbdalla/agent-skills`. Run a skill directly with `/aym-skills:work-my-way`, `/aym-gtm:daily-plan` and so on.
+Install only the plugins you want. On Claude Code 2.1.275 or later, one line per plugin also works, for example `/plugin install aym-skills --marketplace AymAbdalla/agent-skills`. Run a skill directly with `/aym-skills:work-my-way`, `/aym-story:blog-it` and so on.
 
 Codex:
 

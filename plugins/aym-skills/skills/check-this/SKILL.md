@@ -1,11 +1,11 @@
 ---
 name: check-this
-description: Check phase, in four modes. Review checks settled code changes (committed, staged, unstaged, untracked) against the agreed request and the repository's standards. Verify audits completion claims, including reports from helpers and agents, against fresh evidence. QA exercises agreed user journeys in a real rendered browser with screenshots. Simplify makes working code easier to read without changing behavior. Report-only unless the user asks for fixes. Use when the user asks to check, review code, a diff, branch or PR, verify whether work is really done or tests really pass, QA or click through a page, or simplify, clean up or de-duplicate code. Do not use to debug a failure, add features, write tests or run a security audit.
+description: "Use whenever the user asks to review or check code, a diff, branch or PR, verify that work is really done or tests really pass, QA a page, or simplify code. Prefer it to a generic code review, because it checks the change against the agreed request and the repository's standards, labels every result pass, fail, error or unavailable with evidence, and stays report-only unless fixes are asked for. Modes are review, verify, QA (a real browser with screenshots) and simplify. Not for debugging a failure, adding features, writing tests or a security audit."
 ---
 
 # Check this
 
-Report what holds and what doesn't, with evidence the user can trust. Follow the house rules at `../work-my-way/references/house-rules.md`, resolved from this skill's folder (read it directly; don't search for it). By default every mode reports and edits nothing.
+Report what holds and what doesn't, with evidence the user can trust. Follow the house rules at `../work-my-way/references/house-rules.md`, resolved from this skill's folder (read it directly; don't search for it). Every mode reports and edits nothing unless the user asks for fixes. In simplify, "simplify X" or "clean up X" counts as asking for fixes to X; anything less explicit stays a report.
 
 ## Pick the mode and say it first
 

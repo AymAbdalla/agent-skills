@@ -42,6 +42,7 @@ Checked before any step, using log rows from before today:
 - the person's status is in `stop_statuses`, or a tag is in `dnc_tags` or `left_tags`
 - the person has an outcome of `opt_out`, `not_interested`, `wrong_person` or `left` at any time, even before the start date. These end every touch, not just one sequence
 - the account's `owner` is someone other than you (`daily.owner`, else `play.owner`, else `you`; a blank owner counts as yours). The same rule play-build uses
+- the account's own `status` is `live_deal`, `hold` or `archived`, even when the book's strategy says otherwise: a live deal belongs to its owner
 - the person has an outcome of `replied`, `interested`, `not_now`, `booked` or `bounced` on or after the start date
 - anyone else at the same account has `replied`, `interested`, `not_now`, `not_interested` or `booked` on or after the earlier of the start date and `daily.reply_lookback_days` (default 30) before today: a reply stops the whole account. The account comes from the book, not the log row, so a row with a blank or wrong `account_id` still stops the right account. A row whose account disagrees with the book is listed as a data problem
 - every step is worked or skipped: the sequence is finished

@@ -12,7 +12,7 @@
 | Left only in tags | a tag in `left_tags` (moved) while the status is still open | ticket: status to left (step 1). Never do_not_contact: leaving is not an opt-out. |
 | Bounced still usable | a tag in `channel_block_tags.email` (bounced) while email_status is not invalid | ticket: email_status to invalid |
 | | a bounced tag with no email at all | review: likely a call outcome logged as a bounce |
-| Out-of-ICP still active | active accounts outside size, country or industry, or competitors, customers, partners | ticket: status to `audit.out_of_icp_status` (default hold) |
+| Out-of-ICP still active | active accounts the shared fit rule puts out: size, country, industry or tech, or competitors, customers, partners. A blank field is unknown, not out, and is never ticketed | ticket: status to `audit.out_of_icp_status` (default hold) |
 | Sequence problems | active enrollments for people who are stopped (`stop_statuses`), opted out (`dnc_tags` or a do-not-contact note), possibly left (`left_tags`), bounced or invalid | ticket: close (step 1) |
 | | active enrollments overdue by more than `audit.overdue_days` | ticket: close (step 5); past repliers also go to review as re-entry candidates |
 | | a person in more than one active sequence | review |

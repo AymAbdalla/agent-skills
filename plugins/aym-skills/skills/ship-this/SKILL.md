@@ -33,16 +33,17 @@ Run the project's relevant checks against the files you will commit, after the l
 
 ## Commit
 
-1. Stage only the related files by name. Never use `git add -A`, `git add .` or `git commit -a`.
-2. Write the message to a file in the session's task scratch folder (the host temp area if none): an imperative subject that names the outcome, then a short body when the reason is not obvious. Match the project's message conventions and any required trailers. Describe only what the staged diff contains.
-3. Commit with an explicit pathspec so other staged files stay out: `git commit -F <message-file> -- <file> ...`.
-4. Read back: `git show --stat HEAD` must list exactly the selected files; `git status --short` must still show the unrelated paths. Then delete the message file.
-5. Do not amend, rebase or squash commits that already exist on a remote unless the user asks.
+1. Check who the commit will be authored by: read `git config user.name` and `git config user.email`. If either is an AI or tool name (for example Claude, Codex, an assistant or a bot) and the project or the user bans AI attribution, stop and ask which identity to use. With the user's answer, set it for this commit only (`git -c user.name=... -c user.email=... commit ...`). Never change git config without a yes.
+2. Stage only the related files by name. Never use `git add -A`, `git add .` or `git commit -a`.
+3. Write the message to a file in the session's task scratch folder (the host temp area if none): an imperative subject that names the outcome, then a short body when the reason is not obvious. Match the project's message conventions and any required trailers. Describe only what the staged diff contains.
+4. Commit with an explicit pathspec so other staged files stay out: `git commit -F <message-file> -- <file> ...`.
+5. Read back: `git show --stat HEAD` must list exactly the selected files and the author you checked in step 1; `git status --short` must still show the unrelated paths. Then delete the message file.
+6. Do not amend, rebase or squash commits that already exist on a remote unless the user asks.
 
 ## Sync, only when requested
 
 1. Run `git fetch` and compare the branch with its upstream (`git status -sb`). If the upstream has new commits, pull them before committing: `git pull --ff-only`. If that refuses because both sides moved, rebase only your own unpushed commits (`git pull --rebase`). If a conflict appears, stop and report the conflicting files; never resolve a conflict by discarding someone's changes.
-2. Commit related files as below, then push as below.
+2. Commit related files as in Commit above, then push as in Push and PR below.
 3. Report what came down from GitHub (commit count and subjects) and what went up.
 
 ## Merge, only when the user says "merge"
@@ -59,4 +60,4 @@ Run the project's relevant checks against the files you will commit, after the l
 
 ## Report
 
-List each state separately with its evidence: checks run and results, commit hash and files, push target and verified remote ref, PR URL, sync pull results, merge result if any, and actions not taken (deploy, watch). Name unrelated files left unstaged or uncommitted. End with the stop card; the last phase's card has no "Next" unless the user asked for a further operation. See [operations detail](references/operations.md) for edge cases.
+List each state separately with its evidence: checks run and results, commit hash and files, push target and verified remote ref, PR URL, sync pull results, merge result if any, and actions not taken (deploy, watch). Name unrelated files left unstaged or uncommitted. End with the stop card. When shipping is the last phase, its "Next" line says "nothing further" unless the user asked for another operation. See [operations detail](references/operations.md) for edge cases.

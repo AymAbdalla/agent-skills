@@ -1,6 +1,6 @@
 ---
 name: play-build
-description: Design and fill one outbound play from the account book. Decides who qualifies, which person at each account gets the touch, how many start each day and when the play stops, and writes a proposed enrollment list with every drop counted and explained. Play types are signal, event, reactivation, multithread and blitz. Use when the user says "build a play", "who should go into this sequence", "set up a win-back play", "invite people to our event", "multithread our engaged accounts", "run a blitz on these accounts", or "who qualifies for this campaign". Do not use to clean lists (data-quality), build or rebuild the book (account-book), score signals (signal-score), write the messages (outreach-draft) or plan today's touches (daily-plan). Never enrolls anyone in a real tool.
+description: Design and fill one outbound play from the account book. Decides who qualifies, who at each account gets the touch, how many start a day and when it stops, and writes a proposed enrollment list with every drop counted. Types are signal, event, reactivation, multithread and blitz, with an optional holdout. Use for "build a play", "who goes into this sequence", "set up a win-back play", "invite people to our event" or "who qualifies for this campaign". Not for lists, the book, signals, messages or daily plans. Never enrolls anyone.
 ---
 
 # Play build
@@ -18,14 +18,14 @@ In the commands below, `<skill-dir>` is this skill's folder and `<workspace>` is
 - `book/people.csv` and `book/accounts.csv` from account-book. The book's gates (`send_ok`, `call_ok`) and each account's `strategy` are used as they are.
 - `gtm.json`: the `play` section (defaults for caps, seat order, quiet rules), stop statuses and tags. Every number is an editable default, not a standard.
 - `plays/<play_id>/play.json`: the play itself. See [play.json](references/play-json.md).
-- By type: `signals/scored.csv` (signal), an events CSV (event), `log/activity.csv` (reactivation, multithread, recent touches), `outreach/sequences.json` (sequence length and variables).
+- By type: `signals/scored.csv` (signal), an events CSV (event), `log/activity.csv` (reactivation, multithread, recent touches), `outreach/sequences.json` (sequence length and variables). Without `sequences.json` the script assumes a 10-day sequence (`play.default_sequence_days`) and says so under "Needs you"; event cutoffs then use that guess.
 - Optional `plays/<play_id>/overrides.csv`: your manual adds and removals, each with a reason.
 
 When the user has no workspace, offer the made-up example in [assets/example](assets/example/README.md). Customer or employer data stays where the user may keep it.
 
 ## Steps
 
-1. **Agree the play.** Ask what triggers it, who it is for, which sequence, the channel (email, call or any), the start and end dates and the daily cap. Write `plays/<play_id>/play.json`. Pick the type with [play types](references/play-types.md).
+1. **Agree the play.** Ask what triggers it, who it is for, which sequence, the channel (email, call or any), the start and end dates and the daily cap. These answers decide who gets contacted, so a missing one is never filled with a guess: ask, and stop until the user answers. Nobody being there to answer is not an answer. Suggest the values from `gtm.json` `play` when the user wants a starting point. Write `plays/<play_id>/play.json` with what they agreed; the script refuses a play without `channel`, `start`, `daily_cap` or `sequence` and writes nothing. Pick the type with [play types](references/play-types.md).
 2. **Run it:**
    `python3 <skill-dir>/scripts/build_play.py --workspace <workspace> --play <workspace>/plays/<play_id>/play.json --today YYYY-MM-DD`
 3. **Read the funnel** (`plays/<play_id>/funnel.md`). Every person in the book is counted at the start, and every rule shows how many it removed and why. See [eligibility rules](references/eligibility.md). If a rule removes more than expected, fix the data or the rule, not the count.
@@ -37,7 +37,8 @@ When the user has no workspace, offer the made-up example in [assets/example](as
 
 - **Every drop is counted with a reason.** Nobody disappears from a play without a line in the funnel, and the funnel checks that the start count minus every drop equals the proposed count. A failed check is a bug to report before approving anything.
 - **One live play per person.** Someone already in a sequence or approved in another play that is still running is dropped and listed as "reply in that thread instead". People in an open conversation are left to you.
-- **The book's gate decides who may be touched.** Excluded, on-hold and live-deal accounts stay out. An account owned by someone else is a counted drop.
+- **The book's gate decides who may be touched, and the account's own status is checked again.** Excluded, on-hold and live-deal strategies stay out, and so does any account whose `status` is `live_deal`, `hold` or `archived`, whatever its strategy says. An account owned by someone else is a counted drop.
+- **An optional holdout measures the play.** `holdout_share` (default 0) keeps that share of eligible accounts untouched, picked by a stable hash of the play id and account id, so the same accounts stay out on every rerun. It is applied after seat choice, so each held-out account contributes the seats that would have been touched, each a counted drop with the reason "holdout"; an override cannot add someone back at a held-out account, and funnel-review compares the play with its holdout.
 - **One person per account per day,** at most `per_account_cap` per account, at most `daily_cap` a day, round-robin across accounts in rank order.
 - **Signal seats follow the signal.** A named new leader gets the touch. Never the person who left. Research-interest signals are timing only and are never quoted.
 - **Only confirmed facts are quoted.** When signal-score flags that the source may be about another company, or the named leader is not in the book, `trigger_fact` stays blank and "Needs you" says what to confirm. The named leader's own line says "you", never their name.

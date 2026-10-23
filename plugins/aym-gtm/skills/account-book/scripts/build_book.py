@@ -19,6 +19,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from gtm_fit import fit as icp_fit  # noqa: E402  (shared ICP-fit rule, copied in four skills)
+
 PEOPLE_COLS = ["person_id", "account_id", "first_name", "last_name", "title", "email",
                "email_status", "email_score", "phone", "linkedin_url", "country", "timezone",
                "status", "last_touch_date", "sequence", "tags", "notes", "crm_id", "source"]
@@ -60,6 +63,8 @@ NO_OUTBOUND = {"excluded", "hold", "live"}
 DEFAULT_BOOK = {
     "sources": ["input/researched.csv", "input/verified.csv", "input/people.csv"],
     "ready_min": 2,
+    # Ready also needs these roles among the send-ready buyers (Oct 22 review).
+    "ready_requires_roles": ["decision_maker"],
     "priority_tiers": ["P1", "P2"],
     "area_code_tz": {},
     "fix_fields": ["first_name", "last_name", "title", "email", "phone", "linkedin_url", "country", "status"],
@@ -85,8 +90,8 @@ def load_config(workspace):
     for _, lane, _, _ in personas:
         if lane and lane not in lanes:
             lanes.append(lane)
-    size_min = to_num(cfg.get("icp", {}).get("size", {}).get("min"))
     rules = {
+        "icp": cfg.get("icp", {}),
         "stop_statuses": cfg.get("stop_statuses", DEFAULT_RULES["stop_statuses"]),
         "dnc_tags": cfg.get("dnc_tags", DEFAULT_RULES["dnc_tags"]),
         "left_tags": cfg.get("left_tags", DEFAULT_RULES["left_tags"]),
@@ -97,7 +102,7 @@ def load_config(workspace):
         "dnc_notes": [x.lower() for x in cfg.get("clean", {}).get("dnc_note_patterns",
                                                                   DEFAULT_RULES["dnc_note_patterns"])],
     }
-    return cfg, gate, book, personas, lanes, size_min, rules
+    return cfg, gate, book, personas, lanes, rules
 
 
 def to_num(value):
@@ -422,10 +427,16 @@ def _common_blocks(person, acct, rules, channel):
         reasons.append(f"account relationship is {rel}")
     strategy = acct.get("strategy", "")
     if strategy in NO_OUTBOUND:
+        held = "account is on hold" if acct_status(acct) == "hold" else \
+            f"account held: {acct.get('strategy_reason') or 'hold'}"
         why = {"live": "a live deal is open; the deal owner leads",
-               "hold": "account is on hold", "excluded": "account is excluded"}[strategy]
+               "hold": held, "excluded": "account is excluded"}[strategy]
         if not (strategy == "excluded" and rel and rel in rules["exclude_relationships"]):
             reasons.append(why)
+    else:
+        verdict, reason = icp_fit(acct, rules["icp"])
+        if verdict == "unknown":
+            reasons.append(f"fit unknown: {reason}")
     return reasons
 
 
@@ -523,30 +534,76 @@ def time_zone(person, area_map):
     return "", "unknown"
 
 
-def strategy_for(acct, people, signals, book, size_min, rules):
-    """Ordered ladder. The first rule that matches wins. A manual override sticks."""
-    if acct.get("strategy_override"):
-        return acct["strategy_override"], "manual override"
+UPDATE_FIELDS = ("status", "owner", "relationship")
+
+
+def apply_account_updates(acct_rows, path, warnings):
+    """Overlay input/account-updates.csv (crm-sync's to-book-accounts.csv) on the account
+    sources. Non-blank status, owner and relationship values become source values, so
+    your own book edits still win, except an open deal: those account ids are returned
+    and set to live_deal whatever the book says."""
+    rows, _ = read_csv(path)
+    by_id = {a["account_id"]: a for a in acct_rows}
+    by_crm = {a.get("crm_id", ""): a for a in acct_rows if a.get("crm_id")}
+    forced = set()
+    for u in rows:
+        target = by_id.get(u.get("account_id", "")) or by_crm.get(u.get("crm_id", ""))
+        if target is None:
+            warnings.append("account update for an unknown account was skipped: "
+                            + (u.get("account_id") or u.get("crm_id") or "no id"))
+            continue
+        for field in UPDATE_FIELDS:
+            if u.get(field):
+                target[field] = u[field]
+        if acct_status(u) == "live_deal":
+            forced.add(target["account_id"])
+    return forced
+
+
+def _blocking_strategy(acct, rules):
+    """The ladder rules that turn outbound off. None when none match."""
     rel = acct.get("relationship", "")
+    status = acct_status(acct)
     if rel == "parent_decides":
         return "hold", "the parent company decides"
     if rel and rel in rules["exclude_relationships"]:
         return "excluded", f"relationship is {rel}"
-    if acct.get("status") == "hold":
+    if status == "hold":
         return "hold", "account is on hold"
-    emp = to_num(acct.get("employees"))
-    if size_min is not None and emp is not None and emp < size_min:
-        return "hold", f"below the size floor of {size_min:g}"
-    if acct.get("status") == "archived":
+    verdict, reason = icp_fit(acct, rules["icp"])
+    if verdict == "out":
+        return "hold", f"outside the ICP: {reason}"
+    if status == "archived":
         return "hold", "account is archived"
+    if status == "live_deal":
+        return "live", "a deal is open; the owner leads"
+    return None
+
+
+def acct_status(acct):
+    """Account status compared without case or stray spaces ("Live_Deal" is live_deal)."""
+    return (acct.get("status") or "").strip().lower().replace(" ", "_")
+
+
+def strategy_for(acct, people, signals, book, rules):
+    """Ordered ladder. The first rule that matches wins. A manual override sticks, but
+    never above a rule that turns outbound off (parent decides, excluded, hold, outside
+    the ICP, archived, live deal): those still win and say the override was not applied."""
+    override = (acct.get("strategy_override") or "").strip()
+    blocked = _blocking_strategy(acct, rules)
+    if blocked:
+        strategy, reason = blocked
+        if override and override != strategy:
+            reason += f" (override {override} not applied: outbound stays off)"
+        return strategy, reason
+    if override:
+        return override, "manual override"
     acct_tags = set(split_list(acct.get("tags")))
     if acct_tags & set(book["reengage_account_tags"]):
         return "re-engage", "tagged " + ",".join(sorted(acct_tags & set(book["reengage_account_tags"])))
     replied = [p for p in people if set(split_list(p.get("tags"))) & set(book["reengage_person_tags"])]
     if replied:
         return "re-engage", f"{len(replied)} person(s) replied before"
-    if acct.get("status") == "live_deal":
-        return "live", "a deal is open; the owner leads"
     sig = signals.get(acct["account_id"])
     if sig:
         return "signal", f"playable signal: {sig}"
@@ -570,7 +627,7 @@ def build(workspace, out_dir, today, signals_path=None, export_ids=None):
     input_dir = (workspace / "input").resolve()
     if out_dir.resolve() == input_dir or input_dir in out_dir.resolve().parents:
         raise ValueError("refusing to write into the input folder")
-    cfg, gate, book_cfg, personas, lanes, size_min, rules = load_config(workspace)
+    cfg, gate, book_cfg, personas, lanes, rules = load_config(workspace)
 
     sources, extra_cols, warnings = [], [], []
     missing_required = [rel for rel in book_cfg.get("required_sources", []) if not (workspace / rel).is_file()]
@@ -597,6 +654,7 @@ def build(workspace, out_dir, today, signals_path=None, export_ids=None):
     people, built_people_out, adopted = reconcile(merged, book_rows, built_rows, today, conflicts, rules, area_map)
 
     acct_rows, acct_cols = read_csv(workspace / "input" / "accounts.csv")
+    forced_live = apply_account_updates(acct_rows, workspace / "input" / "account-updates.csv", warnings)
     old_accts = {r["account_id"]: r for r in read_csv(out_dir / "accounts.csv")[0]}
     built_accts = {r["account_id"]: r for r in read_csv(out_dir / ".built" / "accounts.csv")[0]}
     accounts = {}
@@ -614,6 +672,8 @@ def build(workspace, out_dir, today, signals_path=None, export_ids=None):
                     row[field] = old.get(field, "")
                 elif not a.get(field):
                     row[field] = old.get(field, "")
+        if a["account_id"] in forced_live:
+            row["status"] = "live_deal"  # an open deal in the CRM beats any edit: the deal owner leads
         accounts[a["account_id"]] = row
     for aid, old in old_accts.items():
         if aid not in accounts:
@@ -630,7 +690,7 @@ def build(workspace, out_dir, today, signals_path=None, export_ids=None):
     signals = load_signals(Path(signals_path) if signals_path else workspace / "signals" / "scored.csv")
     for aid, a in accounts.items():
         a["strategy"], a["strategy_reason"] = strategy_for(a, by_acct.get(aid, []), signals,
-                                                           book_cfg, size_min, rules)
+                                                           book_cfg, rules)
     for p in people:
         acct = accounts.get(p.get("account_id", ""), {})
         p["send_ok"], p["send_block_reason"] = first_touch_gate(p, acct, gate, rules)
@@ -647,7 +707,8 @@ def build(workspace, out_dir, today, signals_path=None, export_ids=None):
         a["people_count"] = str(len(group))
         a["buying_group_count"] = str(len(buying))
         a["send_ok_count"] = str(len(ok))
-        if len(ok) >= int(book_cfg["ready_min"]):
+        roles_ok = all(any(p["role"] == r for p in ok) for r in book_cfg.get("ready_requires_roles") or [])
+        if len(ok) >= int(book_cfg["ready_min"]) and roles_ok:
             a["readiness"] = "ready"
         elif buying:
             a["readiness"] = "enrich"

@@ -34,7 +34,7 @@ Times come from an optional `updated_at` column on each side. A time must carry 
 
 ## Row floors and stopped runs
 
-A short export looks exactly like mass deletion. If `people.csv` or `accounts.csv` has fewer rows than `sync.row_floor_share` (default 0.8) of the last export, the run stops, writes only `report.md`, and leaves the state alone. Export again.
+A short export looks exactly like mass deletion. If `people.csv`, `accounts.csv` or `opportunities.csv` has fewer rows than `sync.row_floor_share` (default 0.8) of the last export, the run stops, writes only `report.md`, and leaves the state alone. Export again.
 
 When a run stops (a row floor, or a missing book or export), the last run's plan files are renamed to `*.stale.csv` (and `report.stale.md`) so nobody applies an old plan beside a stopped report.
 
@@ -49,6 +49,10 @@ Each log row and each CRM activity row has its outcome turned into book changes 
 A log row or CRM activity row whose person is at a different account in the book goes to review as "person and account disagree". It is not planned for the CRM and not brought into the log. The person is still clear from their id, so a stop outcome on that row (an opt-out, not interested, wrong person, left, or a bounce) is still applied to the person in the same run. Only the activity row waits for the fix.
 
 Rows that wait for a person do not depend on time. Log rows the CRM does not have yet, CRM activity the log does not have yet, unconfirmed bounces and unapplied outcome changes come back on every run until the other side shows them. An outcome change planned more than `sync.carry_forward_runs` times without being applied moves to review. Field updates are safe to apply twice; a create or a logged activity is not. When a create or log row was planned on an earlier run and the export still does not show it, its reason says so and the report asks you to search the CRM before applying it again. The state remembers the first planned date (`planned_writes`).
+
+## Account status, owner and open deals
+
+The CRM is the record for three account fields: `status`, `owner` and `relationship`. Non-blank CRM values that differ from the book go to `to-book-accounts.csv`; a blank never clears the book. With `opportunities.csv`, an account with an open opportunity is set to `live_deal` (the deal owner leads), and a book account at `live_deal` goes back to `active` only when the export has that account's opportunities and all are closed. One with no row in the export stays `live_deal` and the report names it ("Live deal kept at ..."): a partial export must never reopen outbound. Copy the file to `input/account-updates.csv` and rebuild the book: account-book applies these as source values, except that an open deal sets `live_deal` even over a hand edit. Nothing is planned for the CRM from these fields.
 
 ## Outcomes from the log and the CRM
 
@@ -85,7 +89,7 @@ A later outcome for the same person replaces an earlier one. account-book takes 
 |---|---|---|
 | plan | this script (default) | Plan files only. |
 | copy | this script, `--rung copy` | Planned person updates applied to a copy of the export, with a row log. |
-| live | a person, or an executor they approved | The person applies `to-crm.csv` in their CRM. |
+| live | a person, or a tool the person runs and approves | The person applies `to-crm.csv` in their CRM. This script never does. |
 
 The script refuses `--rung live`. A bare "yes" never moves up a rung: each rung needs its own clear go-ahead. Every planned row names one record and one field; there are no bulk writes without a record id. The first `sync.pilot_rows` rows (default 3) are the pilot: apply those, check them in the CRM, then do the rest. When applying, check the CRM still shows `current_value`; if not, skip the row and rerun the sync. Keep going past a failed row and note it.
 

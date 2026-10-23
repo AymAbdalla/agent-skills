@@ -14,7 +14,7 @@ Accept one of two inputs:
 - **Blog-it articles.** Treat each article as a lead. Its claims still need project evidence.
 - **A named project or repository.** Read its README, decision log or ledger, Git history, tests and recorded results. This route does not need Blog-it.
 
-When the request names no article or repository, ask which work to use. Select exactly one case. When the input holds several, choose the one with the strongest evidence and name the others in your report. Do not merge two stories into one case.
+When the request names no article, project or repository, ask which work to use and stop. Write no draft and no case files until the user names one; several projects being visible in the workspace is not a choice. Select exactly one case. Only when the user named one source that itself holds several cases (an article set, a repository with several projects) may you choose the one with the strongest evidence; name the others in your report. Do not merge two stories into one case.
 
 Before you write, resolve and state:
 

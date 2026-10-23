@@ -497,9 +497,48 @@ class StrategyTests(Base):
         self.build()
         got = {k: v["strategy"] for k, v in self.accounts().items()}
         self.assertEqual(got, {"A1": "re-engage", "A2": "excluded", "A3": "hold", "A4": "hold", "A5": "live",
-                               "A6": "signal", "A7": "priority", "A8": "automated", "A9": "re-engage"})
+                               "A6": "signal", "A7": "priority", "A8": "automated", "A9": "live"})
         self.assertEqual(self.accounts()["A1"]["strategy_reason"], "manual override")
         self.assertEqual(self.accounts()["A1"]["pain_status"], "hypothesis")
+
+    def test_live_deal_beats_a_past_reply_and_blocks_every_channel(self):
+        # Oct 22 review probe: a live deal plus one past reply used to become re-engage.
+        self.build()
+        self.assertEqual(self.accounts()["A9"]["strategy"], "live")
+        r1 = self.people()["r1"]
+        self.assertEqual((r1["send_ok"], r1["call_ok"], r1["linkedin_ok"]), ("no", "no", "no"))
+        self.assertIn("live deal", r1["call_block_reason"])
+
+    def test_override_never_reopens_a_live_deal_or_an_out_of_icp_account(self):
+        # Oct 22 check finding: a manual override switched off the live-deal and out-of-ICP blocks.
+        self.build()
+        rows = read(self.ws / "book/accounts.csv")
+        for r in rows:
+            if r["account_id"] in ("A9", "A4"):
+                r["strategy_override"] = "priority"
+        write(self.ws / "book/accounts.csv", list(rows[0].keys()), rows)
+        write(self.ws / "input/people.csv", PEOPLE, [
+            person(person_id="r1", first_name="R", last_name="One", account_id="A9", email="r@a9.example", tags="past_reply"),
+            person(person_id="s1", first_name="S", last_name="One", account_id="A4", email="s@a4.example")])
+        self.build()
+        accts = self.accounts()
+        self.assertEqual(accts["A9"]["strategy"], "live")
+        self.assertEqual(accts["A4"]["strategy"], "hold")
+        self.assertIn("override priority not applied", accts["A9"]["strategy_reason"])
+        self.assertEqual(accts["A9"]["strategy_override"], "priority")
+        for pid in ("r1", "s1"):
+            p = self.people()[pid]
+            self.assertEqual((p["send_ok"], p["call_ok"], p["linkedin_ok"]), ("no", "no", "no"), pid)
+
+    def test_status_case_does_not_matter(self):
+        rows_path = self.ws / "input/accounts.csv"
+        rows = read(rows_path)
+        for r in rows:
+            if r["account_id"] == "A9":
+                r["status"] = "Live_Deal"
+        write(rows_path, list(rows[0].keys()), rows)
+        self.build()
+        self.assertEqual(self.accounts()["A9"]["strategy"], "live")
 
     def test_readiness_and_lanes(self):
         write(self.ws / "input/accounts.csv", ACCTS, [{"account_id": "A1", "name": "Acme", "domain": "acme.example", "employees": "500"}])
@@ -511,6 +550,45 @@ class StrategyTests(Base):
         self.assertEqual(a["readiness"], "enrich")
         self.assertEqual(a["lanes_covered"], "finance")
         self.assertEqual(a["lanes_missing"], "tech")
+
+
+UPDATE_COLS = ["account_id", "crm_id", "status", "owner", "relationship", "reason"]
+
+
+class AccountUpdateTests(Base):
+    """input/account-updates.csv comes from crm-sync's to-book-accounts.csv."""
+
+    def setUp(self):
+        super().setUp()
+        write(self.ws / "input/accounts.csv", ACCTS, [
+            {"account_id": "A1", "name": "Acme", "domain": "acme.example", "employees": "500", "country": "US",
+             "tier": "P1", "status": "active", "crm_id": "CA1"}])
+        write(self.ws / "input/people.csv", PEOPLE, [
+            person(person_id="p1", first_name="Ana", last_name="Lee", account_id="A1", title="CFO", phone="+1-312-555-0101")])
+
+    def test_open_deal_from_the_crm_sets_live_deal_even_over_an_edit(self):
+        self.build()
+        rows = read(self.ws / "book/accounts.csv")
+        rows[0]["status"] = "active"   # the user's own value in the book
+        write(self.ws / "book/accounts.csv", list(rows[0].keys()), rows)
+        write(self.ws / "input/account-updates.csv", UPDATE_COLS,
+              [{"crm_id": "CA1", "status": "live_deal", "reason": "open opportunity O-1 (stage Demo)"}])
+        self.build("2026-10-21")
+        a = self.accounts()["A1"]
+        self.assertEqual((a["status"], a["strategy"]), ("live_deal", "live"))
+        self.assertEqual(self.people()["p1"]["call_ok"], "no")
+
+    def test_owner_and_relationship_updates_apply_as_source_values(self):
+        write(self.ws / "input/account-updates.csv", UPDATE_COLS,
+              [{"account_id": "A1", "owner": "jordan", "relationship": "customer", "reason": "CRM account record"}])
+        self.build()
+        a = self.accounts()["A1"]
+        self.assertEqual((a["owner"], a["relationship"], a["strategy"]), ("jordan", "customer", "excluded"))
+
+    def test_update_for_an_unknown_account_is_a_warning(self):
+        write(self.ws / "input/account-updates.csv", UPDATE_COLS, [{"crm_id": "NOPE", "status": "live_deal"}])
+        result = self.build()
+        self.assertTrue(any("NOPE" in w for w in result["warnings"]))
 
 
 class RankTests(Base):
@@ -567,6 +645,45 @@ class RankTests(Base):
         self.build()
         res = rank.rank_accounts(self.ws, "2026-10-20")
         self.assertEqual(res["effective"], ["A1"])   # live deal, user-excluded and ICP-excluded are all out
+
+class FitRankingAndReadinessTests(Base):
+    """Oct 22 review: ranking ignored ICP fit, and 'ready' did not need a decision maker."""
+
+    def test_great_fit_outranks_a_well_staffed_poor_fit(self):
+        cfg = dict(CFG, icp={"size": {"min": 200, "max": 5000, "sweet_min": 300, "sweet_max": 1000}},
+                   segments=[{"id": "core", "industries": ["logistics"], "size_min": 300, "size_max": 1000}],
+                   scoring={"account": {"sweet_spot": 3, "in_band": 1, "segment_match": 1}},
+                   ranking={"top_n": 1})
+        (self.ws / "gtm.json").write_text(json.dumps(cfg))
+        write(self.ws / "input/accounts.csv", ACCTS, [
+            {"account_id": "A1", "name": "Great fit", "domain": "a1.example", "employees": "600",
+             "industry": "logistics", "country": "US", "tier": "P2"},
+            {"account_id": "A2", "name": "Poor fit", "domain": "a2.example", "employees": "4500",
+             "industry": "retail", "country": "US", "tier": "P2"}])
+        write(self.ws / "input/people.csv", PEOPLE, [
+            person(person_id="g1", first_name="G", last_name="One", account_id="A1", email="g1@a1.example", title="CFO")]
+            + [person(person_id=f"p{i}", first_name=f"P{i}", last_name="Two", account_id="A2",
+                      email=f"p{i}@a2.example", title=t) for i, t in enumerate(["CFO", "Controller", "Head of IT"])])
+        self.build()
+        res = rank.rank_accounts(self.ws, "2026-10-20")
+        self.assertEqual(res["effective"], ["A1"])
+        report = (self.ws / "book/top-report.md").read_text()
+        self.assertIn("ICP fit", report)
+
+    def test_ready_needs_a_send_ready_decision_maker(self):
+        write(self.ws / "input/accounts.csv", ACCTS, [
+            {"account_id": "A1", "name": "Champions only", "domain": "acme.example", "employees": "500", "country": "US"}])
+        write(self.ws / "input/people.csv", PEOPLE, [
+            person(person_id="c1", first_name="Cat", last_name="One", account_id="A1", title="Controller"),
+            person(person_id="c2", first_name="Cal", last_name="Two", account_id="A1", title="Controller")])
+        self.build()
+        self.assertEqual(self.accounts()["A1"]["readiness"], "enrich")
+        write(self.ws / "input/people.csv", PEOPLE, [
+            person(person_id="c1", first_name="Cat", last_name="One", account_id="A1", title="Controller"),
+            person(person_id="d1", first_name="Dee", last_name="Three", account_id="A1", title="CFO")])
+        self.build("2026-10-21")
+        self.assertEqual(self.accounts()["A1"]["readiness"], "ready")
+
 
 class ExampleTests(unittest.TestCase):
     def test_example_rebuild_matches_its_readme(self):

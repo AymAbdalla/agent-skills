@@ -23,11 +23,13 @@ One file per play at `plays/<play_id>/play.json`. Keys you leave out fall back t
 | Key | Meaning |
 |---|---|
 | `id` | Lowercase letters, numbers and dashes. It is also the folder name. |
+| required | `id`, `type`, `sequence`, `start`, `channel` and `daily_cap`. A play missing any of them is refused and nothing is written: ask the user. |
 | `type` | `signal`, `event`, `reactivation`, `multithread` or `blitz`. |
 | `sequence` | A sequence id from `outreach/sequences.json`. Its length sets event cutoffs; its variables become columns to fill. |
 | `start`, `end` | First and last possible start dates. `end` is optional. |
 | `channel` | `email` uses `send_ok`, `call` uses `call_ok`, `any` uses either. |
-| `daily_cap`, `per_account_cap`, `recent_touch_days`, `owner`, `seat_order`, `max_quiet_runs`, `conversation_days` | Override the `gtm.json` defaults for this play. |
+| `daily_cap`, `per_account_cap`, `recent_touch_days`, `owner`, `seat_order`, `max_quiet_runs`, `conversation_days` | Override the `gtm.json` defaults for this play. `daily_cap` is required in play.json itself. |
+| `holdout_share` | 0 to 0.5, default 0. That share of eligible accounts stays untouched for comparison (see eligibility rule 9b). |
 | `personas` | Persona ids allowed in. Empty means any buyer. |
 | `accounts` | Blitz only: account ids in the order to work them. |
 | `event` | Event only: `{"event_id": "E1", "invites_per_account": 2, "finish_days_before": 2, "file": "input/events.csv"}`. |

@@ -22,7 +22,7 @@ Each brief contains:
 
 Mark how you know each fact in the brief. Write "verified (command you ran)" or "belief, check it". Write a negative as a search result ("searched for X in Y, found none") rather than "there is no X". Never size a work list from a search that was cut off or truncated. Give a reviewing helper the work and the requirements, not the builder's claims about it.
 
-Pick the helper's model under the shared policy's model rules and record the choice.
+Use the helper model the user or the project's instructions name; with none named, use the host's default. Record the choice in the final summary. Cheaper models skip "stop and ask" steps more often, so give them parts whose decisions are already settled.
 
 ## One writer per surface
 

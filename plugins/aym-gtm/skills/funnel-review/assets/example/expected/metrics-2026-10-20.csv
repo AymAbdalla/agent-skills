@@ -22,3 +22,7 @@ test,test:opener-oct:B,conversations per connect,22,31,0.7097,0.5341,0.8390,meas
 test,test:opener-oct:C,conversations per connect,9,54,0.1667,0.0902,0.2874,measured
 test,test:angle-oct:trigger,people who replied per first touch,9,34,0.2647,0.1460,0.4312,measured
 test,test:angle-oct:problem_question,people who replied per first touch,2,50,0.0400,0.0110,0.1346,measured
+cohort,week:2026-08-31,meeting_rate,5,21,0.2381,0.1063,0.4509,measured
+cohort,week:2026-09-21,meeting_rate,5,9,,,,too few to rate
+cohort,week:2026-09-28 (not mature),meeting_rate,1,18,,,,too few to rate
+cohort,week:2026-10-05 (not mature),meeting_rate,3,12,,,,too few to rate

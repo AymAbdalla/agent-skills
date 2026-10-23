@@ -30,7 +30,7 @@ def draft(body=GOOD_BODY, subject="Brightmill month end", sent=" ", **fields):
             "source": "https://brightmill.example/careers/ap-lead", "source_date": "2026-10-20",
             "status": "ready"}
     base.update(fields)
-    lines = ["## d-1 | Test person"] + [f"- {k}: {v}" for k, v in base.items() if v is not None]
+    lines = ["## d-1 | Dana Okafor, Controller, Brightmill"] + [f"- {k}: {v}" for k, v in base.items() if v is not None]
     lines.append(f"- [{sent}] sent")
     if subject is not None:
         lines += ["", f"Subject: {subject}"]
@@ -108,7 +108,7 @@ class CopyRules(unittest.TestCase):
         self.assertIn("marked sent but did not pass", r["fails"])
 
     def test_linkedin_connect_note_limit(self):
-        note = "Hi Sam, I work with finance teams on month end and saw the new distribution site. Happy to connect."
+        note = "Hi Dana, I work with finance teams on month end and saw the new distribution site. Happy to connect."
         ok = run(draft(body=note, subject=None, channel="linkedin", proof=""))
         self.assertEqual(ok["verdict"], "PASS", ok["fails"])
         r = run(draft(body=note + " More." * 60, subject=None, channel="linkedin", proof=""))
@@ -199,6 +199,96 @@ class Sequences(unittest.TestCase):
         self.assertIn("variable 'mystery' is not declared", fails)
         self.assertIn("first step must start a new thread", fails)
         self.assertIn("sequence is missing 'stop_rules'", fails)
+
+
+PROBE_1 = ("Hi Dana, I noticed your team has been researching AP automation tools lately and saw the AP lead "
+           "opening. Most teams we work with close three days faster and cut invoice costs in half. Is month end "
+           "speed a priority for you this quarter?")
+PROBE_2 = ("Hi Sarah, congrats on Brightmill's recent funding round and the new CFO hire. When a finance team "
+           "grows, month end often gets slower before it gets faster. Is close speed something you are working "
+           "on this quarter?")
+
+
+class TruthChecks(unittest.TestCase):
+    """The two probe drafts from the Oct 22 quality review both passed before these checks."""
+
+    def test_intent_words_fail(self):
+        r = run(draft(body=PROBE_1, proof=""))
+        self.assertEqual(r["verdict"], "FAIL")
+        self.assertTrue(any("research interest" in f for f in r["fails"]), r["fails"])
+
+    def test_spelled_out_numbers_must_be_backed(self):
+        r = run(draft(body=PROBE_1, proof=""))
+        joined = " ".join(r["fails"])
+        self.assertIn("'three'", joined)
+        self.assertIn("'half'", joined)
+
+    def test_seller_claim_without_proof_needs_a_human(self):
+        body = ("Hi Dana, I saw Brightmill posted an opening for an AP lead on October 20. Teams like yours "
+                "usually feel month end first when the team grows. Is close speed something you are working on?")
+        r = run(draft(body=body, proof=""))
+        self.assertEqual(r["verdict"], "NEEDS_HUMAN", r["fails"])
+        self.assertTrue(any("seller claim" in w for w in r["warns"]), r["warns"])
+
+    def test_greeting_must_match_the_person(self):
+        r = run(draft(body=PROBE_2, proof=""))
+        self.assertEqual(r["verdict"], "FAIL")
+        self.assertTrue(any("greets 'Sarah'" in f for f in r["fails"]), r["fails"])
+
+    def test_facts_not_in_why_now_need_a_human(self):
+        r = run(draft(body=PROBE_2.replace("Hi Sarah", "Hi Dana"), proof=""))
+        self.assertEqual(r["verdict"], "NEEDS_HUMAN", r["fails"])
+        self.assertTrue(any("funding" in w for w in r["warns"]), r["warns"])
+
+    def test_ordinary_phrases_are_not_false_alarms(self):
+        # Oct 22 check finding: these good drafts failed or needed a human for no reason.
+        opener = "Hi Dana, I saw Brightmill posted an opening for an AP lead on October 20. "
+        for ask in ("Worth a two-minute look at how approvals run today?",
+                    "Does month end get harder in the second half of the year?",
+                    "Hiring year-round tends to strain approvals. Is that true for you?",
+                    "Worth looking into before the new lead starts?"):
+            r = run(draft(body=opener + ask, proof=""))
+            self.assertEqual(r["verdict"], "PASS", (ask, r["fails"], r["warns"]))
+
+    def test_greeting_allows_a_short_form_a_generic_hello_and_accents(self):
+        tail = ", I saw Brightmill posted an opening for an AP lead on October 20. Is close speed on your list?"
+        cases = {"Robert Whitfield": "Hi Rob", "Dana Okafor": "Hi there", "Jose Ruiz": "Hi José",
+                 "José Ruiz": "Hi Jose"}
+        for person, hello in cases.items():
+            text = draft(body=hello + tail, proof="").replace("Dana Okafor", person)
+            r = run(text)
+            self.assertEqual(r["verdict"], "PASS", (person, hello, r["fails"]))
+
+    def test_an_accented_wrong_name_is_still_caught(self):
+        tail = ", I saw Brightmill posted an opening for an AP lead on October 20. Is close speed on your list?"
+        r = run(draft(body="Hi Zoë" + tail, proof=""))
+        self.assertEqual(r["verdict"], "FAIL")
+        self.assertTrue(any("greets 'Zoë'" in f for f in r["fails"]), r["fails"])
+
+    def test_book_gate_blocks_people_who_may_not_be_emailed(self):
+        book = {"p-014": {"send_ok": "no", "followup_ok": "no", "call_ok": "yes", "linkedin_ok": "yes",
+                          "send_block_reason": "status do_not_contact"}}
+        d = lint.parse_drafts(draft())[0]
+        r = lint.lint_draft(d, RULES, REGISTRY, TODAY, book=book)
+        self.assertEqual(r["verdict"], "FAIL")
+        self.assertTrue(any("status do_not_contact" in f for f in r["fails"]), r["fails"])
+        missing = lint.lint_draft(lint.parse_drafts(draft(person_id="p-999"))[0], RULES, REGISTRY, TODAY, book=book)
+        self.assertTrue(any("not in book/people.csv" in f for f in missing["fails"]), missing["fails"])
+
+    def test_cli_reads_the_book_when_it_exists(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            (ws / "book").mkdir()
+            (ws / "book/people.csv").write_text("person_id,send_ok,followup_ok,call_ok,linkedin_ok,send_block_reason\n"
+                                                "p-014,no,no,yes,yes,tag opted_out\n")
+            f = ws / "drafts.md"
+            f.write_text(draft())
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                code = lint.main(["--workspace", str(ws), "--config", str(EXAMPLE / "gtm.json"),
+                                  "--proof", str(EXAMPLE / "outreach/proof.json"), "--drafts", str(f),
+                                  "--today", "2026-11-02"])
+        self.assertEqual(code, 1)
+        self.assertIn("tag opted_out", out.getvalue())
 
 
 class ExampleAndCli(unittest.TestCase):

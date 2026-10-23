@@ -73,7 +73,7 @@ class ExampleTests(unittest.TestCase):
     def test_broken_example_leaves_flagged_stages_out_of_the_pick(self):
         with tempfile.TemporaryDirectory() as tmp:
             code, text = run(["--workspace", str(EXAMPLE / "broken"), "--out", tmp])
-            self.assertIn("Automate first: S04", text)
+            self.assertIn("Automate first (provisional: fix the flow first): S04", text)
             md = Path(tmp, "map.md").read_text()
             self.assertEqual(md, (EXAMPLE / "broken/motion/map.md").read_text())
         self.assertIn("- S12 Log outcomes and set the next step: has findings (G1, G2, G4)", md)
@@ -294,6 +294,52 @@ class DiagramAndCliTests(unittest.TestCase):
             (mp / "map.json").write_text(json.dumps(base_map([stage("A")])), encoding="utf-8-sig")
             code, _ = run(["--workspace", tmp])
             self.assertEqual(code, 0)
+
+
+class HonestPickTests(unittest.TestCase):
+    """Oct 22 review: a pick on a broken map, and a send step relabeled as reversible."""
+
+    def test_broken_flow_makes_the_pick_provisional(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            code, text = run(["--workspace", str(EXAMPLE / "broken"), "--out", tmp])
+            self.assertEqual(code, 1)
+            self.assertIn("provisional", text.lower())
+            self.assertIn("Provisional", Path(tmp, "map.md").read_text())
+            code, text = run(["--workspace", str(EXAMPLE), "--out", tmp])
+            self.assertNotIn("provisional", text.lower())
+
+    def test_writing_to_a_send_tool_counts_as_irreversible(self):
+        m = json.loads((EXAMPLE / "motion/map.json").read_text())
+        for s in m["stages"]:
+            if s["id"] == "S07":
+                s["irreversible"] = False
+        res = cm.analyze(m, CFG)
+        self.assertIn(("R2", "S07"), [(c, w) for c, w, _ in res.findings])
+        for s in m["stages"]:
+            if s["id"] == "S07":
+                s["irreversible_override"] = "the sequencer here only stages drafts; a person sends"
+        res = cm.analyze(m, CFG)
+        self.assertNotIn(("R2", "S07"), [(c, w) for c, w, _ in res.findings])
+
+    def test_measured_volume_from_the_activity_log(self):
+        import shutil
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp) / "ws"
+            shutil.copytree(EXAMPLE, ws)
+            m = json.loads((ws / "motion/map.json").read_text())
+            for s in m["stages"]:
+                if s["id"] == "S12":
+                    s["measure"] = {"channel": "call", "direction": "out"}
+            (ws / "motion/map.json").write_text(json.dumps(m))
+            rows = ["activity_id,timestamp,person_id,account_id,channel,direction,outcome"]
+            for i in range(40):
+                rows.append(f"a{i},2026-10-{(i % 20) + 1:02d}T10:00:00-04:00,p{i},A1,call,out,no_answer")
+            rows.append("x1,2026-08-01T10:00:00-04:00,p1,A1,call,out,no_answer")   # older than 4 weeks
+            (ws / "log").mkdir()
+            (ws / "log/activity.csv").write_text("\n".join(rows) + "\n")
+            code, text = run(["--workspace", str(ws), "--out", str(ws / "out"), "--today", "2026-10-22"])
+            md = (ws / "out/map.md").read_text()
+        self.assertIn("about 10 items a week (measured from the log)", md)
 
 
 if __name__ == "__main__":

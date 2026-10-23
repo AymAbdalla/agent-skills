@@ -14,7 +14,7 @@ Tracking what the learner has learned is the point of these skills, so they upda
 
 - After each explanation, explain-it-my-way records the main terms it taught as `shown`.
 - When the user explains a concept back in their own words, it records `passed` only if they got all of it right. A wrong or half-right answer is `missed`, with the missing part in the note, so the next quiz brings it back.
-- After the user shares quiz results, test-my-knowledge records each objective's concept as `passed` only when every question on that objective was answered right. Anything less, including half right, is `missed`.
+- After the user shares quiz results, test-my-knowledge records each objective's concept as `passed` only when every main question on that objective was answered right (reserve retest questions don't count toward it). Anything less, including half right, is `missed`.
 - When the user asks not to be taught or quizzed on something, record it as `declined`.
 
 The user can say "don't track" for a session or a topic. Then leave the ledger alone for it.
@@ -31,6 +31,8 @@ python3 <skill-dir>/scripts/ledger.py record --ledger <path> --status <status> -
 `show` reads the rows. `record` creates the file and its folders if needed, applies the rules below, and prints JSON with `added`, `changed` (each with `from` and `to`) and `unchanged`. List the added and changed rows in the report in one line, for example: "Ledger: added retry, send gate; idempotency key shown -> passed."
 
 If the script cannot run (no Python), follow the same rules by hand and say so in the report.
+
+If the script exits with code 2 and prints `ledger.py: error`, the input or the ledger file is wrong (for example a malformed table or an unknown status). Do not edit or rewrite the ledger to make it pass, and do not record by hand. Quote the error, name the ledger path, and tell the user what to fix. Exit code 1 means the file could not be read or written: report it and continue without the ledger.
 
 ## Keep it clean
 
@@ -52,8 +54,8 @@ If the script cannot run (no Python), follow the same rules by hand and say so i
 
 - **Status**:
   - `shown`: explained, not yet tested.
-  - `missed`: any quiz question on it was answered wrong, or the user's own explanation was wrong or only partly right.
-  - `passed`: the user answered every quiz question on it correctly, or explained all of it correctly in their own words.
+  - `missed`: any main quiz question on it was answered wrong, or the user's own explanation was wrong or only partly right.
+  - `passed`: the user answered every main quiz question on it correctly, or explained all of it correctly in their own words.
   - `declined`: the user asked not to be taught or quizzed on it.
 - **Date**: the day of the evidence, `YYYY-MM-DD`. The script uses today unless `--date` is given.
 - **Source**: `explanation: <topic>` for `shown`; `quiz: <quiz path>, <objective id>` or `said: <what the user said, short>` for `passed` and `missed`; `user: <their request>` for `declined`.

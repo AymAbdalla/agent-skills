@@ -45,6 +45,17 @@ The caller logs the arm used in the `opener` column (calls) or `angle` column (e
 - **Angles**: after the minimum, keep the leader. A trailing angle is rewritten once; if it trails again after the rewrite (its count restarted), cut it.
 - Credit an arm only when nothing else changed for that arm during the test. Log other changes in `funnel/changes.csv`.
 
+## Play holdouts
+
+When play-build sets `holdout_share`, held-out people appear in `enroll.csv` with `drop_reason` starting "holdout". For each such play the report compares, for the current period:
+
+- worked: people approved in the play (no drop reason), booked / worked
+- holdout: held-out people, booked / held out
+
+Both sides count seats: play-build holds out only the person who would have been touched at each held-out account, so the two rates compare like with like.
+
+Both use the usual floors and 95% ranges. Only ranges that do not overlap count as a clear difference; anything else says the play has not yet shown it works.
+
 ## Quota model
 
 `funnel/targets.json`:

@@ -7,7 +7,7 @@ signal-oct,p02,A01,,seq-trigger-finance,,,,,"touched 2026-10-14, within 14 days"
 signal-oct,p03,A01,,seq-trigger-finance,,,,,account cap: 1 per account
 signal-oct,p05,A02,,seq-trigger-finance,,,,,not the seat this signal points to
 signal-oct,p06,A02,,seq-trigger-finance,,,,,email gate: catch-all domain
-signal-oct,p07,A03,,seq-trigger-finance,,,,,account strategy live
+signal-oct,p07,A03,,seq-trigger-finance,,,,,account status live_deal
 signal-oct,p13,A07,,seq-trigger-finance,,,,,owned by jordan
 signal-oct,p18,A10,,seq-trigger-finance,,,,,status do_not_contact
 signal-oct,p20,A01,,seq-trigger-finance,,,,,account cap: 1 per account

@@ -39,6 +39,10 @@ DEFAULTS = {
     "logging_gap_share": 0.1,
     "benchmarks": {},
     "benchmark_alarm_factor": 10,
+    # Meetings often land days or weeks after the first touch (Oct 22 review).
+    "lag_lookback_days": 30,
+    "cohort_maturation_days": 21,
+    "cohort_weeks": 8,
 }
 
 CHANNELS = {"email", "call", "linkedin", "meeting"}
@@ -241,6 +245,7 @@ class Data:
         self.people = {}
         self.accounts = {}
         self.play_of = {}
+        self.groups = {}        # play_id -> {"treated": set, "holdout": set} from play-build's enroll.csv
         self.rows = []
         self._load()
 
@@ -270,6 +275,12 @@ class Data:
         for path in sorted(glob.glob(str(self.ws / "plays" / "*" / "enroll.csv"))):
             self.inputs.append(Path(path))
             for r in read_csv(path):
+                pid, play = r.get("person_id", ""), r.get("play_id", "")
+                reason = (r.get("drop_reason") or "").strip().lower()
+                if pid and reason.startswith("holdout"):
+                    self.groups.setdefault(play, {"treated": set(), "holdout": set()})["holdout"].add(pid)
+                elif pid and not reason and r.get("approved", "").strip().lower() == "yes":
+                    self.groups.setdefault(play, {"treated": set(), "holdout": set()})["treated"].add(pid)
                 if r.get("approved", "").strip().lower() == "yes" and r.get("person_id"):
                     if (r.get("drop_reason") or "").strip():
                         blocked.append(r)
@@ -377,7 +388,7 @@ def period_stats(rows, cfg):
         "booked_outside": len(booked_all - people_touched), "bounces": len(bounces),
         "bounces_outside": unmatched_bounces,
         "opt_outs": len(opt_outs),
-        "_touched_set": people_touched, "_booked_set": booked,
+        "_touched_set": people_touched, "_booked_set": booked, "_booked_all": booked_all,
     }
     s["reply_rate"] = rate_cell(len(replied), len(people_emailed), cfg)
     s["meeting_rate"] = rate_cell(len(booked), len(people_touched), cfg)
@@ -648,6 +659,11 @@ def build(workspace, today, period_days, out_dir=None):
     prev_rows = [r for r in data.rows if prev_start < r["day"] <= cur_start]
     cur = period_stats(cur_rows, cfg)
     prev = period_stats(prev_rows, cfg)
+    lag = int(cfg["funnel"]["lag_lookback_days"])
+    for stats, start in ((cur, cur_start), (prev, prev_start)):
+        stats["booked_earlier"] = booked_from_earlier(data.rows, stats, start, lag)
+    cohorts = cohort_table(data.rows, today, cfg)
+    holdouts = holdout_lift(data, cur_rows, cfg)
 
     seg_of = data.segment
     seg_names = sorted({seg_of(r) for r in cur_rows})
@@ -686,14 +702,71 @@ def build(workspace, today, period_days, out_dir=None):
     out_dir.mkdir(parents=True, exist_ok=True)
 
     lines = render(today, period_days, cur_start, prev_start, data, cur, prev, seg_table, br, tests, q,
-                   changes, acts, cfg)
+                   changes, acts, cfg, cohorts, holdouts)
     report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    write_metrics(metrics_path, cur, prev, seg_table, tests)
+    write_metrics(metrics_path, cur, prev, seg_table, tests, cohorts)
     return {"report": report_path, "metrics": metrics_path, "actions": acts, "bridge": br, "current": cur,
-            "prior": prev, "tests": tests, "quota": q, "excluded": data.excluded, "segments": seg_table}
+            "prior": prev, "tests": tests, "quota": q, "excluded": data.excluded, "segments": seg_table,
+            "cohorts": cohorts, "holdouts": holdouts}
 
 
-def write_metrics(path, cur, prev, seg_table, tests):
+def booked_from_earlier(rows, stats, start, lookback_days):
+    """People booked in the period who were not touched in it but were touched in the
+    lookback window just before it. Shown in the headline, kept out of every rate."""
+    window = start - dt.timedelta(days=lookback_days)
+    earlier = {r["person"] for r in rows if r["direction"] == "out" and r["channel"] in TOUCH_CHANNELS
+               and window < r["day"] <= start}
+    in_period = stats["_touched_set"]
+    booked_outside = stats.get("_booked_all", set()) - in_period
+    return len(booked_outside & earlier)
+
+
+def holdout_lift(data, cur_rows, cfg):
+    """For each play with a holdout: the meeting rate of people the play worked against the
+    people it left alone, both counted on bookings in the current period."""
+    booked = {r["person"] for r in cur_rows if r["outcome"] == "booked"}
+    out = []
+    for play, g in sorted(data.groups.items()):
+        if not g["holdout"]:
+            continue
+        treated = rate_cell(len(g["treated"] & booked), len(g["treated"]), cfg)
+        held = rate_cell(len(g["holdout"] & booked), len(g["holdout"]), cfg)
+        out.append({"play": play, "treated": treated, "holdout": held, "clear": clear_difference(treated, held)})
+    return out
+
+
+def monday(day):
+    return day - dt.timedelta(days=day.weekday())
+
+
+def cohort_table(rows, today, cfg):
+    """Meeting rate by the week of each person's first outbound touch. A week is mature
+    once cohort_maturation_days have passed since its last day."""
+    f = cfg["funnel"]
+    first = {}
+    for r in rows:
+        if r["direction"] == "out" and r["channel"] in TOUCH_CHANNELS:
+            if r["person"] not in first or r["day"] < first[r["person"]]:
+                first[r["person"]] = r["day"]
+    booked = {r["person"] for r in rows if r["outcome"] == "booked"}
+    oldest = monday(today) - dt.timedelta(weeks=int(f["cohort_weeks"]) - 1)
+    weeks = {}
+    for person, day in first.items():
+        wk = monday(day)
+        if wk >= oldest:
+            weeks.setdefault(wk, set()).add(person)
+    out = []
+    for wk in sorted(weeks):
+        people = weeks[wk]
+        k = len(people & booked)
+        last_day = wk + dt.timedelta(days=6)
+        out.append({"week": wk.isoformat(), "people": len(people), "booked": k,
+                    "cell": rate_cell(k, len(people), cfg),
+                    "mature": (today - last_day).days >= int(f["cohort_maturation_days"])})
+    return out
+
+
+def write_metrics(path, cur, prev, seg_table, tests, cohorts=()):
     with open(path, "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh, lineterminator="\n")
         w.writerow(["period", "scope", "metric", "numerator", "denominator", "rate", "ci_low", "ci_high", "label"])
@@ -712,9 +785,12 @@ def write_metrics(path, cur, prev, seg_table, tests):
         for t in tests:
             for a in t["arms"]:
                 row("test", "test:{}:{}".format(t["id"], a["arm"]), t.get("metric", ""), a["cell"])
+        for c in cohorts:
+            row("cohort", "week:" + c["week"] + ("" if c["mature"] else " (not mature)"), "meeting_rate", c["cell"])
 
 
-def render(today, period_days, cur_start, prev_start, data, cur, prev, seg_table, br, tests, q, changes, acts, cfg):
+def render(today, period_days, cur_start, prev_start, data, cur, prev, seg_table, br, tests, q, changes, acts, cfg,
+           cohorts=(), holdouts=()):
     f = cfg["funnel"]
     L = []
     L.append("# Funnel review: {} days ending {}".format(period_days, today.isoformat()))
@@ -741,6 +817,8 @@ def render(today, period_days, cur_start, prev_start, data, cur, prev, seg_table
                        ("Emails sent", "emails_sent"), ("Dials", "dials"), ("Connects", "connects"),
                        ("Conversations", "conversations"), ("People booked", "booked_people")):
         L.append("| {} | {} | {} | count |".format(label, prev[key], cur[key]))
+    L.append("| Booked from earlier touches (not in the rate) | {} | {} | count |".format(
+        prev["booked_earlier"], cur["booked_earlier"]))
     for label, key in (("Reply rate (people replied / people emailed)", "reply_rate"),
                        ("Meeting rate (people booked / people touched)", "meeting_rate"),
                        ("Connect rate (connects / dials)", "connect_rate"),
@@ -775,6 +853,33 @@ def render(today, period_days, cur_start, prev_start, data, cur, prev, seg_table
         L.append("")
         L.append("**Check the base.**")
         L += ["- " + a for a in alarms]
+    L.append("")
+    L.append("## Cohorts by first-touch week")
+    L.append("")
+    if cohorts:
+        L.append("Each person counts once, in the week of their first touch, with every meeting booked since. "
+                 "A week is mature {} days after its last day; judge only mature weeks.".format(
+                     f["cohort_maturation_days"]))
+        L.append("")
+        L.append("| Week of | People first touched | Booked so far | Meeting rate | Mature? |")
+        L.append("|---|---|---|---|---|")
+        for c in cohorts:
+            L.append("| {} | {} | {} | {} | {} |".format(c["week"], c["people"], c["booked"], show(c["cell"]),
+                                                       "yes" if c["mature"] else "not yet"))
+    else:
+        L.append("No first touches in the last {} weeks.".format(f["cohort_weeks"]))
+    if holdouts:
+        L.append("")
+        L.append("## Play holdouts")
+        L.append("")
+        L.append("Meeting rate this period for people each play worked and for its holdout, the accounts it "
+                 "left alone on purpose. Only non-overlapping 95% ranges count as a clear difference.")
+        L.append("")
+        L.append("| Play | Worked | Holdout | Clear difference? |")
+        L.append("|---|---|---|---|")
+        for h in holdouts:
+            L.append("| {} | {} | {} | {} |".format(h["play"], show(h["treated"]), show(h["holdout"]),
+                                                   "yes" if h["clear"] else "no"))
     L.append("")
     L.append("## Why meetings moved")
     L.append("")
@@ -876,6 +981,9 @@ def render(today, period_days, cur_start, prev_start, data, cur, prev, seg_table
             L.append("- {} of {} people booked were booked on {}.".format(by_channel[k], m, names.get(k, k)))
         for k in sorted(by_play):
             L.append("- {} of {} people booked came from {}.".format(by_play[k], m, k))
+    elif cur["booked_earlier"]:
+        L.append("- Nobody touched this period has booked yet; {} people booked this period came from earlier "
+                 "touches (see the cohort table).".format(cur["booked_earlier"]))
     else:
         L.append("- Nobody was booked this period.")
     L.append("")
@@ -908,7 +1016,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="Review the outbound funnel from the activity log.")
     ap.add_argument("--workspace", default="gtm", help="GTM workspace folder (default ./gtm)")
     ap.add_argument("--today", required=True, help="YYYY-MM-DD, the last day of the current period")
-    ap.add_argument("--period-days", type=int, default=7, help="length of each period in days (default 7)")
+    ap.add_argument("--period-days", type=int, default=30, help="length of each period in days (default 30)")
     ap.add_argument("--out", help="folder for the report (default <workspace>/funnel)")
     args = ap.parse_args(argv)
     try:

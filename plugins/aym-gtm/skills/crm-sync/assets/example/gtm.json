@@ -32,7 +32,13 @@
       "customer",
       "partner",
       "parent_decides"
-    ]
+    ],
+    "technographics": {
+      "required_any": [],
+      "excluded": [],
+      "note": "Optional. Tool names matched against the accounts 'tech' column (semicolon list). Empty lists turn the rule off."
+    },
+    "review_by": "2027-04-30"
   },
   "personas": [
     {
@@ -309,10 +315,18 @@
       "416": "America/Toronto",
       "512": "America/Chicago",
       "415": "America/Los_Angeles"
-    }
+    },
+    "ready_requires_roles": [
+      "decision_maker"
+    ]
   },
   "ranking": {
-    "top_n": 3
+    "top_n": 3,
+    "fit_points": {
+      "sweet_spot": 5,
+      "in_band": 0,
+      "segment_match": 2
+    }
   },
   "send_gate": {
     "email_status_ok": [
@@ -340,7 +354,7 @@
       },
       "hiring": {
         "weight": 4,
-        "expires_days": 180,
+        "expires_days": 60,
         "seat": "the likely manager of the open role"
       },
       "funding": {
@@ -350,7 +364,7 @@
       },
       "topic_intent": {
         "weight": 3,
-        "expires_days": 90,
+        "expires_days": 30,
         "seat": "decision maker"
       },
       "growth": {
@@ -408,7 +422,68 @@
       "referral",
       "close_the_loop"
     ],
-    "proof_max_age_days": 365
+    "proof_max_age_days": 365,
+    "intent_words": [
+      "researching",
+      "been looking into",
+      "been looking at",
+      "visited our",
+      "on our website",
+      "your team has been reading",
+      "intent data",
+      "in-market",
+      "showed interest in"
+    ],
+    "number_ok_phrases": [
+      "first half",
+      "second half"
+    ],
+    "number_words": [
+      "two",
+      "three",
+      "four",
+      "five",
+      "six",
+      "seven",
+      "eight",
+      "nine",
+      "ten",
+      "dozen",
+      "twice",
+      "double",
+      "doubled",
+      "triple",
+      "tripled",
+      "half",
+      "percent"
+    ],
+    "claim_phrases": [
+      "teams we work with",
+      "teams like yours",
+      "companies like yours",
+      "our customers",
+      "our clients",
+      "customers see",
+      "we help",
+      "we helped",
+      "most teams we"
+    ],
+    "fact_words": [
+      "raised",
+      "funding",
+      "round",
+      "acquired",
+      "acquisition",
+      "named",
+      "appointed",
+      "hired",
+      "hire",
+      "promoted",
+      "joined",
+      "ipo",
+      "launched",
+      "expanded"
+    ]
   },
   "daily": {
     "user_timezone": "America/New_York",
@@ -467,7 +542,6 @@
       "never_touched",
       "buying_role",
       "seniority",
-      "has_deal",
       "newest"
     ],
     "block_order": [
@@ -507,7 +581,10 @@
     },
     "logging_gap_share": 0.1,
     "benchmarks": {},
-    "benchmark_alarm_factor": 10
+    "benchmark_alarm_factor": 10,
+    "lag_lookback_days": 30,
+    "cohort_maturation_days": 21,
+    "cohort_weeks": 8
   },
   "motion": {
     "max_nodes": 15,
@@ -617,7 +694,8 @@
       "meeting",
       "call back",
       "intro"
-    ]
+    ],
+    "holdout_share": 0
   },
   "sync": {
     "fields": [

@@ -103,6 +103,61 @@ class Base(unittest.TestCase):
         return code, out.getvalue() + err.getvalue()
 
 
+class LiveDealTests(Base):
+    """Oct 22 review probe: a live-deal account the book had marked re-engage."""
+
+    def setUp(self):
+        super().setUp()
+        write(self.ws / "book/accounts.csv", ACCTS + ["strategy", "owner"], [
+            {"account_id": "A1", "name": "Acme", "tier": "P1", "status": "live_deal", "strategy": "re-engage"},
+            {"account_id": "A2", "name": "Bolt", "tier": "P2", "status": "active", "strategy": "automated"}])
+
+    def test_no_extra_touch_at_a_live_deal_account(self):
+        self.setup([person("ann", "A1", role="decision_maker", tags="past_reply", notes="x"),
+                    person("bo", "A2", notes="x")])
+        _, plan = self.plan(date(2026, 10, 20))
+        names = {c["person_id"] for c in plan["cards"]}
+        self.assertNotIn("ann", names)
+        self.assertIn("bo", names)
+        self.assertTrue(any("live_deal" in r for r in plan["dropped"]), plan["dropped"])
+
+    def test_sequence_stops_at_a_live_deal_account(self):
+        self.setup([person("ann", "A1")], [enroll("ann", "2026-10-20")])
+        _, plan = self.plan(date(2026, 10, 20))
+        self.assertEqual(plan["cards"], [])
+        self.assertTrue(any("live_deal" in s["reason"] for s in plan["stopped"]), plan["stopped"])
+
+    def test_open_deals_are_not_a_tie_break_bonus_by_default(self):
+        self.assertNotIn("has_deal", pd.DEFAULT_DAILY["fact_ladder"])
+        self.assertNotIn("has_deal", CFG["daily"]["fact_ladder"])
+
+
+class StatedDefaultTests(Base):
+    """D1 (Oct 22): a read-only plan may use a stated default, and says which one."""
+
+    def test_no_date_plans_today_in_your_time_zone_and_says_so(self):
+        from datetime import datetime, timezone
+        self.setup([person("bo", "A2", notes="x")])
+        tz = self.cfg["daily"]["user_timezone"]
+        offset = pd.utc_offset(tz, datetime.now(timezone.utc).date())
+        today = (datetime.now(timezone.utc) + offset).date()
+        code, out = self.cli()
+        self.assertEqual(code, 0, out)
+        if pd.is_business_day(today, set()):
+            text = (self.ws / "plan" / f"{today.isoformat()}.md").read_text()
+            self.assertIn(f"No date was given, so this is the plan for today, {today.isoformat()}", text)
+        else:
+            self.assertIn("not a business day", out)
+
+    def test_do_first_names_no_prep_cards(self):
+        self.setup([person("bo", "A2", notes="")])
+        _, plan = self.plan(date(2026, 10, 20))
+        self.assertTrue(plan["cards"] and all(c["status"] == "no_prep" for c in plan["cards"]))
+        line = pd.first_action(plan)
+        self.assertNotIn("needs_human", line)
+        self.assertIn("no_prep", line)
+
+
 class DateMathTests(unittest.TestCase):
     def test_business_days_skip_weekends_and_holidays(self):
         h = {"2026-10-16"}

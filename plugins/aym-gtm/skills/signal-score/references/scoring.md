@@ -8,9 +8,9 @@ Every number here is a default in `gtm.json` under `signals`. Change them to fit
 | --- | --- | --- | --- | --- |
 | `new_leader` | 5 | 180 days | the named new leader | New leaders review tools and spend in their first months. |
 | `leader_gap` | 4 | 180 days | the most senior remaining leader, never the person who left | Someone is covering two jobs and looking for help. |
-| `hiring` | 4 | 180 days | the likely manager of the open role | A job post names a problem the team is paying to solve. |
+| `hiring` | 4 | 60 days | the likely manager of the open role | A job post names a problem the team is paying to solve. Most roles are filled within weeks. |
 | `funding` | 4 | 365 days | decision maker | New money, new plans, new budget. |
-| `topic_intent` | 3 | 90 days | decision maker | Timing only. Never mention it. |
+| `topic_intent` | 3 | 30 days | decision maker | Timing only. Never mention it, and never playable on its own. |
 | `growth` | 2 | 180 days | decision maker | New sites, offices or teams add process strain. |
 | `layoffs` | 0 | 180 days | context only | Context for tone. Never a reason to reach out. |
 
@@ -39,7 +39,7 @@ A signal is expired when its age is greater than its type's `expires_days`. Expi
 Worked example (today is 2026-10-20):
 
 - New CFO named 2026-09-28: age 22, factor 1.0, value 5 x 1.0 = 5.0
-- AP job posted 2026-08-01: age 80, factor 0.7, value 4 x 0.7 = 2.8
+- AP job posted 2026-08-31: age 50, factor 0.7, value 4 x 0.7 = 2.8 (a job post older than 60 days would have expired)
 - Score = 5.0 + 2.8 = **7.8**
 
 A second job post at the same account would not add to the score, because only the best hiring value counts. This keeps one noisy careers page from outranking a real leadership change.
@@ -67,9 +67,21 @@ An account with live signals is playable only when:
 
 - `status` is not in `blocked_status` (default: hold, live_deal, archived)
 - `relationship` is not blocked. The blocked list is `signals.blocked_relationships` when set, otherwise `icp.exclude_relationships`, otherwise competitor, customer and partner. `parent_decides` is always blocked.
-- at least one live signal has a weight above 0
+- the account fits the ICP by the shared fit rule (`scripts/gtm_fit.py`): out lists the reason, a blank field lists "fit unknown: enrich first"
+- at least one live signal has a weight above 0 and is not timing-only. When the only live signals are timing-only (default `topic_intent`), `why_not` is "intent only: find a citable reason first"
 
 If any check fails, `playable` is `no` and `why_not` lists every reason. Held accounts still show their score and signals so you can see what you are waiting on.
+
+## Fit by timing (`quadrant`)
+
+| Fit | Citable live signal | Quadrant | What to do |
+| --- | --- | --- | --- |
+| in | yes | act | work it if the gate allows |
+| in | no | nurture | watch for a signal |
+| out or unknown | yes | verify | check the fit before any touch |
+| out or unknown | no | suppress | leave it |
+
+Status (hold, live deal) is separate from the quadrant: it only decides `playable`.
 
 ## What the why-now line uses
 

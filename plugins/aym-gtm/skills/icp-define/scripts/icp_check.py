@@ -21,7 +21,11 @@ import json
 import math
 import re
 import sys
+from datetime import date
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from gtm_fit import fit as icp_fit  # noqa: E402  (shared ICP-fit rule, copied in four skills)
 
 ALLOWED_RELATIONSHIPS = {"competitor", "customer", "partner", "parent_decides"}
 ALLOWED_ROLES = {"decision_maker", "champion", "influencer", "technical_gatekeeper", "user"}
@@ -217,7 +221,7 @@ def _employees(value):
         return None
     try:
         return int(float(text))
-    except ValueError:
+    except (ValueError, OverflowError):  # "nan" and "inf" are not headcounts
         return None
 
 
@@ -235,34 +239,15 @@ def classify_account(row, cfg):
     """Return the extra columns for one account. Fit only: status does not change fit."""
     icp = cfg["icp"]
     size = icp["size"]
-    rel = (row.get("relationship") or "").strip().lower()
-    country = (row.get("country") or "").strip().upper()
     industry = (row.get("industry") or "").strip().lower()
-    ind_in = [str(i).lower() for i in icp.get("industries_in", [])]
-    ind_out = [str(i).lower() for i in icp.get("industries_out", [])]
     n = _employees(row.get("employees"))
     band = size_band(n, size)
     out = {"in_icp": "no", "icp_reason": "", "size_band": band, "segment": "", "account_points": 0,
            "points_detail": ""}
 
-    if rel and rel in icp.get("exclude_relationships", []):
-        out["icp_reason"] = f"excluded relationship: {rel}"
-    elif country not in [str(c).upper() for c in icp.get("countries", [])]:
-        out["icp_reason"] = f"country {country or 'blank'} is not in the ICP"
-    elif industry in ind_out:
-        out["icp_reason"] = f"excluded industry: {industry}"
-    elif ind_in and industry not in ind_in:
-        out["icp_reason"] = f"industry {industry or 'blank'} is not on the ICP list"
-    elif n is None:
-        out["in_icp"] = "unknown"
-        out["icp_reason"] = "headcount unknown, enrich before deciding"
-    elif band == "below":
-        out["icp_reason"] = f"below the size floor ({n} < {size['min']})"
-    elif band == "above":
-        out["icp_reason"] = f"above the size ceiling ({n} > {size['max']})"
-    else:
-        out["in_icp"] = "yes"
-        out["icp_reason"] = "fits the ICP"
+    verdict, reason = icp_fit(row, icp)
+    out["in_icp"] = {"in": "yes", "out": "no", "unknown": "unknown"}[verdict]
+    out["icp_reason"] = reason
 
     if out["in_icp"] == "yes":
         for seg in cfg.get("segments", []):
@@ -331,20 +316,33 @@ def market_estimates(cfg, counts_in_list):
     return rows
 
 
-def read_accounts(path):
+def read_accounts(path, required=("account_id", "industry", "country", "employees")):
     with open(path, newline="", encoding="utf-8-sig") as fh:
         reader = csv.DictReader(fh)
         fields = list(reader.fieldnames or [])
         rows = list(reader)
-    missing = [c for c in ("account_id", "industry", "country", "employees") if c not in fields]
+    missing = [c for c in required if c not in fields]
     if missing:
         raise ValueError(f"{path} is missing columns: {', '.join(missing)}")
     rows.sort(key=lambda r: r.get("account_id", ""))
     return fields, rows
 
 
-def render_report(results, estimates, errors, warnings, accounts_path):
+def render_report(results, estimates, errors, warnings, accounts_path, won=None):
     lines = ["# ICP check", ""]
+    if won is not None:
+        lines += ["## Won deals against the ICP", "",
+                  f"{won['inside']} of {won['total']} won deals inside the ICP. A low share means the ICP "
+                  "does not describe who actually buys: revisit it before scaling outbound.", ""]
+        if won["outside"]:
+            lines += ["| won deal | why outside |", "|---|---|"]
+            lines += [f"| {name} | {reason} |" for name, reason in won["outside"]]
+            lines.append("")
+        if won.get("unknown"):
+            lines += [f"{len(won['unknown'])} unknown: the fit rule cannot judge them yet.", "",
+                      "| won deal | why unknown |", "|---|---|"]
+            lines += [f"| {name} | {reason} |" for name, reason in won["unknown"]]
+            lines.append("")
     if errors:
         lines += ["## Config errors (fix these first)", ""] + [f"- {e}" for e in errors] + [""]
     if warnings:
@@ -376,13 +374,43 @@ def render_report(results, estimates, errors, warnings, accounts_path):
     return "\n".join(lines) + "\n"
 
 
+def won_deals_check(won_rows, account_rows, cfg):
+    """How many won deals fall inside the ICP. A won deal is a customer by now, so its
+    relationship is ignored. A row with only account_id is looked up in the accounts list.
+    A deal the fit rule cannot judge (not in the list, or blank fields) is unknown, not outside."""
+    by_id = {r.get("account_id", ""): r for r in account_rows or []}
+    inside, outside, unknown, total = 0, [], [], 0
+    for w in won_rows:
+        row = dict(by_id.get(w.get("account_id", ""), {}))
+        row.update({k: v for k, v in w.items() if v})
+        row["relationship"] = ""
+        total += 1
+        verdict, reason = icp_fit(row, cfg["icp"])
+        name = row.get("name") or row.get("account_id") or "unnamed"
+        if verdict == "in":
+            inside += 1
+        elif verdict == "out":
+            outside.append((name, reason))
+        else:
+            if w.get("account_id") not in by_id and not any(w.get(k) for k in ("industry", "country", "employees")):
+                reason = "not in the accounts list: add its industry, country and employees"
+            unknown.append((name, reason))
+    return {"total": total, "inside": inside, "outside": outside, "unknown": unknown}
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Validate gtm.json and sort accounts against the ICP.")
     ap.add_argument("--workspace", default="gtm", help="GTM workspace folder (default ./gtm)")
     ap.add_argument("--config", help="path to gtm.json (default <workspace>/gtm.json)")
     ap.add_argument("--accounts", help="accounts CSV (default <workspace>/input/accounts.csv if it exists)")
     ap.add_argument("--out", help="folder to write accounts-icp.csv and icp-check.md")
+    ap.add_argument("--won", help="won deals CSV (default <workspace>/input/won-deals.csv if it exists)")
+    ap.add_argument("--today", help="YYYY-MM-DD for the review date check (default: today)")
     args = ap.parse_args(argv)
+    try:
+        today = date.fromisoformat(args.today) if args.today else date.today()
+    except ValueError:
+        ap.error("--today must be YYYY-MM-DD")
 
     ws = Path(args.workspace)
     cfg_path = Path(args.config) if args.config else ws / "gtm.json"
@@ -392,9 +420,16 @@ def main(argv=None):
         print(f"Cannot read config {cfg_path}: {exc}", file=sys.stderr)
         return 2
     errors, warnings = validate_config(cfg)
+    review_by = (cfg.get("icp") or {}).get("review_by")
+    if review_by:
+        try:
+            if date.fromisoformat(str(review_by)) < today:
+                warnings.append(f"review the ICP: icp.review_by {review_by} has passed")
+        except ValueError:
+            errors.append(f"icp.review_by must be YYYY-MM-DD, got {review_by!r}")
 
     acc_path = Path(args.accounts) if args.accounts else ws / "input" / "accounts.csv"
-    results, fields = None, []
+    results, fields, rows = None, [], []
     if errors:
         print("Config errors:")
         for e in errors:
@@ -408,6 +443,16 @@ def main(argv=None):
             print(f"Cannot read accounts: {exc}", file=sys.stderr)
             return 2
         results = [(row, classify_account(row, cfg)) for row in rows]
+
+    won_path = Path(args.won) if args.won else ws / "input" / "won-deals.csv"
+    won = None
+    if args.won or won_path.exists():
+        try:
+            _, won_rows = read_accounts(won_path, required=("account_id",))
+        except (OSError, ValueError) as exc:
+            print(f"Cannot read won deals: {exc}", file=sys.stderr)
+            return 2
+        won = won_deals_check(won_rows, rows, cfg)
 
     counts = {}
     for _, r in results or []:
@@ -424,6 +469,11 @@ def main(argv=None):
             tally[r["in_icp"]] = tally.get(r["in_icp"], 0) + 1
         print(f"Accounts: {len(results)} read; in {tally.get('yes', 0)}, out {tally.get('no', 0)}, "
               f"unknown {tally.get('unknown', 0)}")
+    if won is not None:
+        print(f"Won deals: {won['inside']} of {won['total']} won deals inside the ICP"
+              + (f"; outside: {', '.join(n for n, _ in won['outside'])}" if won["outside"] else "")
+              + (f"; {len(won['unknown'])} unknown: {', '.join(n for n, _ in won['unknown'])}"
+                 if won.get("unknown") else ""))
     for e in estimates:
         est = "no count source" if e["estimate"] is None else f"~{e['estimate']:,} ({e['band']})"
         print(f"  segment {e['segment']}: {e['in_list']} in list; market {est}")
@@ -444,7 +494,7 @@ def main(argv=None):
                 writer.writeheader()
                 for row, r in results:
                     writer.writerow({**row, **r})
-        targets[1].write_text(render_report(results, estimates, errors, warnings, acc_path), encoding="utf-8")
+        targets[1].write_text(render_report(results, estimates, errors, warnings, acc_path, won), encoding="utf-8")
         print(f"Wrote {out}")
     return 0
 

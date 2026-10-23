@@ -16,6 +16,7 @@ For each answer, record its basis:
 ## 2. Best customers
 
 - Name 5 to 10 customers who bought fast, stayed and grew. What do they have in common: size, industry, country, systems they use, how they grew?
+- Can you export recent won deals? Saved as `input/won-deals.csv`, the check measures how many fall inside the ICP.
 - Which deals did you lose or regret? What was different about them?
 
 Use the answers to set the sweet spot. The sweet spot is where the good customers cluster. The wider band is where a deal is still possible.
@@ -25,6 +26,7 @@ Use the answers to set the sweet spot. The sweet spot is where the good customer
 - Headcount: the smallest and largest company you can serve, and the range where you win most.
 - Countries or regions you can sell to and support.
 - Industries that buy well. Industries you never sell to, and why.
+- Systems: tools your best customers run that make the deal easier, and tools that rule an account out. These become `icp.technographics` (optional).
 
 ## 4. Exclusions
 
@@ -61,4 +63,4 @@ Group the ICP into 2 to 5 segments, each an industry group plus a size range, th
 
 ## Close
 
-Read back the ICP in five lines and ask the user to confirm or correct it before writing the files.
+Read back the ICP in five lines and ask the user to confirm or correct it before writing the files. Agree a review date (`icp.review_by`), usually a quarter out.

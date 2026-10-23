@@ -28,7 +28,7 @@ Check: 20 in the book minus 16 removed (adds count as negative) equals 4 propose
 - 2: account: signal not playable: only context signals
 
 **2. Account strategy allows outbound**
-- 1: account strategy live
+- 1: account status live_deal
 
 **3. Account is yours to work**
 - 1: owned by jordan

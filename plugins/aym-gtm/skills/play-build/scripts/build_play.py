@@ -19,6 +19,7 @@ Standard library only. Python 3.8+.
 
 import argparse
 import csv
+import hashlib
 import json
 import re
 import sys
@@ -27,6 +28,7 @@ from pathlib import Path
 
 DEFAULT_PLAY = {
     "daily_cap": 5,
+    "holdout_share": 0,
     "per_account_cap": 1,
     "recent_touch_days": 14,
     "owner": "you",
@@ -58,6 +60,18 @@ DEFAULT_STOP = ["hold", "booked", "not_interested", "wrong_person", "left", "do_
 DEFAULT_DNC = ["opted_out", "dnc_all"]
 DEFAULT_LEFT = ["moved"]
 BLOCKED_STRATEGIES = {"excluded", "hold", "live"}
+# Checked on the account's own status too, whatever the book's strategy says: a live
+# deal belongs to its owner even if the book ranked a past reply above it.
+BLOCKED_ACCOUNT_STATUSES = {"live_deal", "hold", "archived"}
+
+
+def account_block(a):
+    status = (a.get("status") or "").strip()
+    if status in BLOCKED_ACCOUNT_STATUSES:
+        return f"account status {status}"
+    if a.get("strategy") in BLOCKED_STRATEGIES:
+        return f"account strategy {a.get('strategy')}"
+    return ""
 TYPES = ("signal", "event", "reactivation", "multithread", "blitz")
 OUTPUTS = ("enroll.csv", "funnel.md", "report.md", "state.json")
 ENROLL_COLS = ["play_id", "person_id", "account_id", "seat", "sequence", "sequence_start",
@@ -217,9 +231,14 @@ def load_play(path, cfg):
         raise ValueError(f"play file not found: {path}")
     with path.open(encoding="utf-8-sig") as fh:
         play = json.load(fh)
-    for key in ("id", "type", "sequence", "start"):
-        if not play.get(key):
-            raise ValueError(f"play.json needs '{key}'")
+    missing = [key for key in ("id", "type", "sequence", "start", "channel", "daily_cap")
+               if play.get(key) in (None, "")]
+    if missing:
+        raise ValueError("play.json is missing: " + ", ".join(missing) + ". Ask the user for them before "
+                         "building the play; nothing was written.")
+    share = play.get("holdout_share", 0)
+    if not isinstance(share, (int, float)) or not 0 <= share <= 0.5:
+        raise ValueError("holdout_share must be a number from 0 to 0.5")
     if play["type"] not in TYPES:
         raise ValueError(f"play type must be one of {', '.join(TYPES)}")
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", play["id"]):
@@ -231,7 +250,7 @@ def load_play(path, cfg):
     if play.get("channel", "email") not in ("email", "call", "any"):
         raise ValueError("play channel must be email, call or any")
     settings = deep_merge(cfg["play"], {k: v for k, v in play.items()
-                                        if k in ("daily_cap", "per_account_cap", "recent_touch_days",
+                                        if k in ("daily_cap", "holdout_share", "per_account_cap", "recent_touch_days",
                                                  "owner", "seat_order", "max_quiet_runs",
                                                  "conversation_days")})
     for sub in ("event", "reactivation", "multithread"):
@@ -550,8 +569,9 @@ def build(workspace, play_path, today):
 
     def account_rule(p):
         a = accounts[p["account_id"]]
-        if a.get("strategy") in BLOCKED_STRATEGIES:
-            return f"account strategy {a.get('strategy')}"
+        blocked = account_block(a)
+        if blocked:
+            return blocked
         if norm(a.get("owner")) not in ("", norm(settings["owner"])):
             return f"owned by {a.get('owner')}"
         return ""
@@ -595,9 +615,7 @@ def build(workspace, play_path, today):
         return "account: " + out_of_scope.get(aid, "not in the book")
     apply("Account is in this play's scope", in_scope, record=False)
     # 2. account strategy
-    apply("Account strategy allows outbound",
-          lambda p: f"account strategy {accounts[p['account_id']].get('strategy')}"
-          if accounts[p["account_id"]].get("strategy") in BLOCKED_STRATEGIES else "")
+    apply("Account strategy allows outbound", lambda p: account_block(accounts[p["account_id"]]))
     # 3. owner
     owner = norm(settings["owner"])
     apply("Account is yours to work",
@@ -654,6 +672,15 @@ def build(workspace, play_path, today):
     # 9. your removals
     apply("Not removed by you", lambda p: f"removed by you: {removed[p['person_id']]}"
           if p["person_id"] in removed else "")
+    # 9b. holdout: a stable share of accounts stays untouched so the play can be measured.
+    # It is applied after seat choice (step 10), so the holdout side counts the same unit as
+    # the worked side: the seat that would have been touched, not everyone eligible there.
+    holdout = float(settings.get("holdout_share") or 0)
+
+    def held_account(aid):
+        if holdout <= 0:
+            return False
+        return int(hashlib.sha256(f"{play['id']}:{aid}".encode()).hexdigest(), 16) / 16 ** 64 < holdout
 
     # your additions come back if the hard rules allow
     added_now = []
@@ -661,6 +688,10 @@ def build(workspace, play_path, today):
         p = next((x for x in people if x["person_id"] == pid), None)
         if p is None:
             needs.append(f"override adds {pid}, who is not in the book")
+            continue
+        if held_account(p.get("account_id", "")) and pid not in kept and pid not in running:
+            needs.append(f"override adds {pid}, but {pid} is at a held-out account: they stay out so the "
+                         "comparison holds. Set holdout_share to 0 to work every account.")
             continue
         if p in alive:
             alive[alive.index(p)] = dict(p, _added=why)
@@ -745,6 +776,14 @@ def build(workspace, play_path, today):
     for p, why in seat_drops:
         dropped[p["person_id"]] = why
     funnel.step(f"Seat choice, at most {per_cap} per account", seat_drops)
+    if holdout > 0:
+        held = [(p, "holdout: kept untouched so the play can be measured") for p in chosen
+                if held_account(p["account_id"]) and p["person_id"] not in kept and p["person_id"] not in running]
+        held_ids = {p["person_id"] for p, _ in held}
+        for p, why in held:
+            dropped[p["person_id"]] = why
+        chosen = [p for p in chosen if p["person_id"] not in held_ids]
+        funnel.step(f"Not in the holdout ({holdout:.0%} of accounts kept untouched for comparison)", held)
 
     # 11. start dates: approved rows keep theirs, then round-robin by account under the daily cap
     tentative = event is not None and norm(event.get("status")) == "tentative"

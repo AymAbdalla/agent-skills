@@ -451,6 +451,74 @@ class Ending(Workspace):
         self.assertIn("Do not plan from it", self.report())
 
 
+class LagAndCohorts(Workspace):
+    """Oct 22 review probe: 10 meetings booked this week from last week's emails read as zero."""
+
+    def probe(self):
+        log = Log()
+        for i in range(25):
+            log.add("2026-10-12", "early{}".format(i), "email", "out", "sent", angle="trigger")
+        for i in range(10):
+            log.add("2026-10-15", "early{}".format(i), "email", "in", "booked")
+        for i in range(25):
+            log.add("2026-10-19", "late{}".format(i), "email", "out", "sent", angle="trigger")
+        self.write(log)
+
+    def test_bookings_from_earlier_touches_are_in_the_headline(self):
+        self.probe()
+        res = self.run_build(7)
+        self.assertEqual(res["current"]["booked_earlier"], 10)
+        text = res["report"].read_text()
+        self.assertIn("| Booked from earlier touches (not in the rate) | 0 | 10 |", text)
+        self.assertNotIn("Nobody was booked this period", text)
+
+    def test_cohort_table_by_first_touch_week(self):
+        self.probe()
+        res = self.run_build(7)
+        cohorts = {c["week"]: c for c in res["cohorts"]}
+        self.assertEqual((cohorts["2026-10-12"]["people"], cohorts["2026-10-12"]["booked"]), (25, 10))
+        self.assertFalse(cohorts["2026-10-12"]["mature"])        # matures 21 days after its last first touch
+        self.assertEqual((cohorts["2026-10-19"]["people"], cohorts["2026-10-19"]["booked"]), (25, 0))
+        self.assertIn("## Cohorts by first-touch week", res["report"].read_text())
+
+    def test_default_period_is_30_days(self):
+        self.probe()
+        import contextlib, io
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(fr.main(["--workspace", str(self.ws), "--today", "2026-10-20",
+                                      "--out", str(self.ws / "out")]), 0)
+        self.assertIn("# Funnel review: 30 days ending 2026-10-20",
+                      (self.ws / "out/report-2026-10-20.md").read_text())
+
+
+class HoldoutLift(Workspace):
+    """play-build's holdout rows let the review compare a play with accounts it left alone."""
+
+    def test_play_and_holdout_rates_side_by_side(self):
+        log = Log()
+        for i in range(20):
+            log.add("2026-10-05", "t{}".format(i), "email", "out", "sent", angle="trigger", play_id="p1")
+        for i in range(6):
+            log.add("2026-10-12", "t{}".format(i), "email", "in", "booked")
+        log.add("2026-10-12", "h0", "email", "in", "booked")
+        self.write(log)
+        enroll = [{"play_id": "p1", "person_id": "t{}".format(i), "account_id": "A{}".format(i), "approved": "yes",
+                   "drop_reason": ""} for i in range(20)]
+        enroll += [{"play_id": "p1", "person_id": "h{}".format(i), "account_id": "H{}".format(i), "approved": "",
+                    "drop_reason": "holdout: kept untouched so the play can be measured"} for i in range(20)]
+        write_csv(self.ws / "plays/p1/enroll.csv", ["play_id", "person_id", "account_id", "approved", "drop_reason"],
+                  enroll)
+        res = self.run_build(30)
+        lift = {h["play"]: h for h in res["holdouts"]}
+        self.assertEqual((lift["p1"]["treated"]["k"], lift["p1"]["treated"]["n"]), (6, 20))
+        self.assertEqual((lift["p1"]["holdout"]["k"], lift["p1"]["holdout"]["n"]), (1, 20))
+        self.assertFalse(lift["p1"]["clear"])    # the 95% ranges overlap at this size
+        text = res["report"].read_text()
+        self.assertIn("## Play holdouts", text)
+        self.assertIn("6 of 20", text)
+        self.assertIn("1 of 20", text)
+
+
 class Example(unittest.TestCase):
     def test_example_matches_the_expected_report(self):
         with tempfile.TemporaryDirectory() as tmp:

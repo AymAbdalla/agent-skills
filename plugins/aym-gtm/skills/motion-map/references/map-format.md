@@ -8,7 +8,7 @@ One file per motion at `<workspace>/motion/map.json`. Write it with the user, or
 | --- | --- |
 | `motion` | `name`, optional `seller` and a one-line `summary`. |
 | `roles` | Who does the work. Each has `id`, `label` and `kind`: `human`, `scheduled_builder` or `executor`. See [stage cards](stage-cards.md) for what each kind may do. |
-| `systems` | Where the work lands. Each has `id`, `label`, `live` (true for a real tool such as a CRM, sequencer or calendar; false for plain files) and `operator`, the one role that writes to it. |
+| `systems` | Where the work lands. Each has `id`, `label`, `live` (true for a real tool such as a CRM, sequencer or calendar; false for plain files), `operator`, the one role that writes to it, and optional `sends` (true or false) to say whether writing to it sends or books. |
 | `start` | The stage the motion starts at. Defaults to the first stage. |
 | `ends` | Stages where the motion is allowed to stop. |
 | `stages` | The stages, in the order you want them listed. |
@@ -33,7 +33,8 @@ One file per motion at `<workspace>/motion/map.json`. Write it with the user, or
 | `exceptions` | `[{"usually": "...", "sometimes": "..."}]`. |
 | `waste` | The handoff into the next stage: `waiting`, `rework`, `handoff`, `manual` or `none`. |
 | `risk` | `{"automated_wrong": low/medium/high, "left_manual": low/medium/high}`. |
-| `irreversible` | true when the stage sends, spends, publishes, books or deletes. |
+| `irreversible` | true when the stage sends, spends, publishes, books or deletes. A stage that writes to a live system that sends or books (named like a sequencer, email, inbox, dialer, calendar, SMS or LinkedIn tool, or marked `sends: true`) is checked as irreversible unless `irreversible_override` gives the reason it can be undone. |
+| `measure` | Optional: `{"channel": "call", "direction": "out", "outcomes": [...]}`. With `--today`, the check counts matching rows in `log/activity.csv` over the last four weeks and uses that weekly number instead of `volume_per_week`, labelled measured. |
 | `loop` | Required when `tier` is `automatic`: see [automation pick](automation-pick.md#loop-check). |
 | `decision` | Required on a decision stage: `question`, `owner` (`rule`, `model`, `human`), `exact_fact`, `consequential`, `if_wrong`, `check`, `accountable`. |
 

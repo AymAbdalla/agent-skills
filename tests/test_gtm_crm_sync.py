@@ -472,6 +472,76 @@ class RoundThreeTests(Base):
         self.assertEqual(self.out("to-log.csv"), [])
 
 
+OPP = ["opportunity_id", "account_crm_id", "stage", "is_closed", "owner", "updated_at"]
+ACCT_UPD = ["account_id", "crm_id", "status", "owner", "relationship", "reason"]
+
+
+class AccountStatusTests(Base):
+    """Open deals, owners and relationships come from the CRM into the book (to-book-accounts.csv)."""
+
+    def setUp(self):
+        super().setUp()
+        write(self.ws / "book/accounts.csv", ACCTS + ["status", "owner", "relationship"], [
+            {"account_id": "A1", "name": "Acme", "domain": "acme.example", "crm_id": "CA1", "status": "active"},
+            {"account_id": "A2", "name": "Beta", "domain": "beta.example", "crm_id": "CA2", "status": "live_deal"}])
+        self.setup([person("p1", "C1")], [crm_row("C1", "p1")])
+
+    def test_open_opportunity_sets_live_deal_and_a_closed_one_clears_it(self):
+        write(self.ws / "input/crm-export/opportunities.csv", OPP, [
+            {"opportunity_id": "O1", "account_crm_id": "CA1", "stage": "Demo", "is_closed": "false", "owner": "ae-1"},
+            {"opportunity_id": "O2", "account_crm_id": "CA2", "stage": "Closed Lost", "is_closed": "true", "owner": "ae-2"}])
+        self.run_sync()
+        rows = {r["account_id"]: r for r in read(self.ws / "sync/to-book-accounts.csv")}
+        self.assertEqual(rows["A1"]["status"], "live_deal")
+        self.assertIn("O1", rows["A1"]["reason"])
+        self.assertEqual(rows["A2"]["status"], "active")
+        self.assertIn("no open opportunity", rows["A2"]["reason"])
+        self.assertIn("account-updates.csv", (self.ws / "sync/report.md").read_text())
+
+    def test_crm_account_owner_and_relationship_come_into_the_book(self):
+        write(self.ws / "input/crm-export/accounts.csv", ["crm_id", "name", "domain", "owner", "relationship"], [
+            {"crm_id": "CA1", "name": "Acme", "domain": "acme.example", "owner": "jordan", "relationship": "customer"},
+            {"crm_id": "CA2", "name": "Beta", "domain": "beta.example", "owner": "", "relationship": ""}])
+        self.run_sync()
+        rows = {r["account_id"]: r for r in read(self.ws / "sync/to-book-accounts.csv")}
+        self.assertEqual((rows["A1"]["owner"], rows["A1"]["relationship"]), ("jordan", "customer"))
+        self.assertNotIn("A2", rows)   # a blank in the CRM never clears the book
+
+    def test_without_an_opportunities_export_live_deal_is_left_alone(self):
+        self.run_sync()
+        self.assertEqual(read(self.ws / "sync/to-book-accounts.csv"), [])
+
+    def test_a_live_deal_missing_from_the_export_stays_live(self):
+        # Oct 22 check finding: a partial opportunities export put live deals back to active.
+        write(self.ws / "input/crm-export/opportunities.csv", OPP, [
+            {"opportunity_id": "O1", "account_crm_id": "CA1", "stage": "Demo", "is_closed": "false", "owner": "ae-1"}])
+        self.run_sync()
+        rows = {r["account_id"]: r for r in read(self.ws / "sync/to-book-accounts.csv")}
+        self.assertNotIn("A2", rows)
+        self.assertIn("Live deal kept at A2", (self.ws / "sync/report.md").read_text())
+
+    def test_a_much_shorter_opportunities_export_stops_the_run(self):
+        opps = [{"opportunity_id": f"O{i}", "account_crm_id": "CA9", "stage": "Closed Lost",
+                 "is_closed": "true", "owner": "ae-1"} for i in range(10)]
+        write(self.ws / "input/crm-export/opportunities.csv", OPP, opps)
+        self.run_sync()
+        write(self.ws / "input/crm-export/opportunities.csv", OPP, opps[:3])
+        self.run_sync()
+        self.assertIn("opportunities.csv has 3 rows", (self.ws / "sync/report.md").read_text())
+
+
+class MappingConfirmationTests(Base):
+    """D1 (Oct 22): with no confirmed mapping the plan still runs, and says so at the top."""
+
+    def test_unconfirmed_mapping_is_flagged_and_confirmed_is_not(self):
+        self.setup([person("p1", "C1")], [crm_row("C1", "p1")])
+        self.run_sync()
+        report = (self.ws / "sync/report.md").read_text()
+        self.assertIn("Mapping unconfirmed", report.splitlines()[2])
+        self.run_sync(mapping_confirmed=True)
+        self.assertNotIn("Mapping unconfirmed", (self.ws / "sync/report.md").read_text())
+
+
 class ExampleTests(unittest.TestCase):
     def test_example_matches_expected(self):
         with tempfile.TemporaryDirectory() as tmp:

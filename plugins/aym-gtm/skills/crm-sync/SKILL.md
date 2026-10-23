@@ -1,6 +1,6 @@
 ---
 name: crm-sync
-description: Keep the prospect book and the CRM in step through files. Compares the book and the activity log with a fresh CRM export, then writes a plan of CRM changes, a file of changes to bring into the book, activity rows to add to the log, conflicts, a review list and each person's sequence state. Newer change wins, a blank never wipes a value, a short export stops the run, and every row is accounted for. Use when the user says "sync with the CRM", "what changed in the CRM", "push my book updates to the CRM", "log these outcomes in the CRM", "handle the bounces", or after exporting from their CRM. Do not use to clean a raw list or audit CRM data quality (data-quality), to build or rebuild the book itself (account-book), to plan the day (daily-plan) or to report results (funnel-review). It never writes to a CRM.
+description: Keep the prospect book and the CRM in step through files. Compares the book and activity log with a fresh CRM export, open deals included, and plans CRM changes, book and account updates, log rows, conflicts and a review list. Newer change wins, a blank never wipes a value, a short export stops the run. Use for "sync with the CRM", "what changed in the CRM" or "handle the bounces". Not for cleaning lists, the book or reports. The script never writes to a CRM; a person applies the plan.
 ---
 
 # CRM sync
@@ -16,7 +16,7 @@ This skill's results come from `scripts/sync_crm.py`. If you cannot run them (no
 All paths sit in the user's GTM workspace (`<workspace>`, default `./gtm`). `<skill-dir>` is this skill's folder. Column details are in [files and columns](references/files.md).
 
 - `book/people.csv` and `book/accounts.csv` from account-book.
-- A fresh CRM export in `input/crm-export/`: `people.csv` (required), and optional `accounts.csv`, `activity.csv`, `bounces.csv`.
+- A fresh CRM export in `input/crm-export/`: `people.csv` (required), and optional `accounts.csv`, `activity.csv`, `bounces.csv` and `opportunities.csv` (open deals; see [files](references/files.md)).
 - `log/activity.csv`, the shared activity log.
 - `sync/state.json` from the last run, if there was one.
 - `gtm.json`: the `sync` section (field mapping, row floor, pilot size and more) plus the shared stop statuses and tags. Every number is an editable default.
@@ -25,7 +25,7 @@ When the user has no workspace yet, offer the made-up example in [assets/example
 
 ## Steps
 
-1. **Show the field mapping.** Read `sync.field_map` and show it as a table: which book column goes to which CRM column. Confirm it before planning anything. A wrong mapping writes good data into the wrong field.
+1. **Show the field mapping.** Read `sync.field_map` and show it as a table: which book column goes to which CRM column, and ask the user to confirm it. A wrong mapping writes good data into the wrong field. Once they confirm, add `--mapping-confirmed` to the run. With nobody there to confirm, run without it: the plan is only a file, and its report opens with "Mapping unconfirmed" so nobody applies it before checking.
 2. **Plan.** Run:
    `python3 <skill-dir>/scripts/sync_crm.py --workspace <workspace> --today YYYY-MM-DD`
    If an export is much smaller than the last one, the run stops and changes nothing. Ask the user to export again.
@@ -33,7 +33,7 @@ When the user has no workspace yet, offer the made-up example in [assets/example
 4. **Optional copy rung.** To see the result before touching the CRM:
    `python3 <skill-dir>/scripts/sync_crm.py --workspace <workspace> --today YYYY-MM-DD --rung copy`
    It applies the planned person updates to a copy of the export in `sync/copy/` and writes a row log (applied, skipped, drift, failed).
-5. **Hand over the plan.** The user (or an executor they approved for this) applies `to-crm.csv`: the pilot rows first, checked in the CRM, then the rest. Each row names one record and one field, and shows the value the CRM held when the plan was made; if the CRM shows something else now, skip that row and rerun the sync. `to-book.csv` goes into `input/` as a source for account-book. `to-log.csv` gets appended to `log/activity.csv`.
+5. **Hand over the plan.** This script never writes to a CRM. The user, or a tool the user runs and approves row by row, applies `to-crm.csv`: the pilot rows first, checked in the CRM, then the rest. Each row names one record and one field, and shows the value the CRM held when the plan was made; if the CRM shows something else now, skip that row and rerun the sync. `to-book.csv` goes into `input/` as a source for account-book. `to-book-accounts.csv` (account status, owner and relationship, and `live_deal` for any account with an open opportunity) is copied to `input/account-updates.csv`; account-book then stops all outbound at accounts with an open deal. `to-log.csv` gets appended to `log/activity.csv`.
 
 The rules behind each step are in [sync rules](references/sync-rules.md).
 

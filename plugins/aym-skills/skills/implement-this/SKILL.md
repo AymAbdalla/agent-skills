@@ -1,6 +1,6 @@
 ---
 name: implement-this
-description: Build phase. Implements an approved plan, spec or ticket slice by slice, test-first, with a check after each slice. Also writes or improves tests on their own, including regression tests and deciding when an edit needs no test. Use when the user asks to implement, build or execute a plan, add tests, write a regression test, or check a fix test-first. Do not use to write the plan, review code, diagnose an unexplained bug, or commit, push or ship.
+description: "Use whenever the user asks to build, implement or execute an approved plan, spec or ticket, or to add or fix tests. Editing code directly skips what this skill guarantees, which is slice-by-slice building, a failing test seen before each fix, a check after each slice, and a stop card that keeps done and verified apart. Also covers regression tests and deciding when an edit needs no test. Not for writing the plan, reviewing code, diagnosing an unexplained bug, or committing."
 ---
 
 # Implement this

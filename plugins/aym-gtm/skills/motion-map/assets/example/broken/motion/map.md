@@ -262,6 +262,8 @@ waiting: 2, rework: 1, manual: 1.
 
 ## Automate first
 
+**Provisional:** the flow has findings (G1 to G4), so this map may not show the real work. Fix the flow first, rerun, then trust the pick.
+
 **S04 Build the play and pick seats**: move from level suggest to draft.
 
 - Repetitive: about 1 item a week, about 45 minutes a week by hand.

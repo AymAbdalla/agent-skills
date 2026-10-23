@@ -1,4 +1,4 @@
-# aym-skills
+# agent-skills
 
 Four plugins of agent skills for Claude Code and Codex. Describe the job in plain words, and the skills plan, build, check and ship it one phase at a time, stopping after each phase so you stay in charge. Nothing commits, pushes, deploys, installs or sends unless you ask for that action.
 
@@ -17,10 +17,10 @@ Claude Code:
 
 ```
 /plugin marketplace add AymAbdalla/agent-skills
-/plugin install aym-skills@aym-skills
-/plugin install aym-story@aym-skills
-/plugin install aym-lab@aym-skills
-/plugin install aym-gtm@aym-skills
+/plugin install aym-skills@aymabdalla
+/plugin install aym-story@aymabdalla
+/plugin install aym-lab@aymabdalla
+/plugin install aym-gtm@aymabdalla
 ```
 
 Install only the plugins you want. On Claude Code 2.1.275 or later, one line per plugin also works, for example `/plugin install aym-skills --marketplace AymAbdalla/agent-skills`. Run a skill directly with `/aym-skills:work-my-way`, `/aym-gtm:daily-plan` and so on.

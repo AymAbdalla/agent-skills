@@ -13,7 +13,7 @@
 Calls are placed in card order, in two passes:
 
 1. **Preferred hours:** a slot whose start and end fall inside `daily.preferred_window` in the prospect's own time zone (default 9am to 5pm).
-2. **Legal hours:** any free slot inside `daily.call_window` in the prospect's time zone (default 8am to 9pm).
+2. **Default calling window:** any free slot inside `daily.call_window` in the prospect's time zone (default 8am to 9pm, the US federal telemarketing default). Several states are stricter (earlier evening end, later start, no Sunday calls), so set the window for the places you call. The skill does not check state rules.
 
 Each placed card shows both times, for example `14:00 America/New_York (their time 11:00 America/Los_Angeles)`.
 
@@ -21,7 +21,7 @@ Each placed card shows both times, for example `14:00 America/New_York (their ti
 | --- | --- |
 | placed | `ready` (or `no_prep`) with a slot |
 | the prospect's time zone is blank or unknown | `needs_human`: check their local time before dialing |
-| slots exist inside their legal hours but all are taken or busy | `overflow`: carried to tomorrow |
+| slots exist inside their calling window but all are taken or busy | `overflow`: carried to tomorrow |
 | none of today's blocks fall inside 8am to 9pm their time | `skipped`: not missed. A sequence call step skips and the sequence moves on |
 
 ## Time zone names

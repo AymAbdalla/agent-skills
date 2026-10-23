@@ -24,17 +24,20 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from gtm_fit import fit as icp_fit  # noqa: E402  (shared ICP-fit rule, copied in four skills)
+
 DEFAULT_TYPES = {
     "new_leader": {"weight": 5, "expires_days": 180, "seat": "the named new leader",
                    "watch": "a new leader in the buying team"},
     "leader_gap": {"weight": 4, "expires_days": 180,
                    "seat": "the most senior remaining leader, never the person who left",
                    "watch": "a leader leaving the buying team"},
-    "hiring": {"weight": 4, "expires_days": 180, "seat": "the likely manager of the open role",
+    "hiring": {"weight": 4, "expires_days": 60, "seat": "the likely manager of the open role",
                "watch": "a job post for a role your product helps"},
     "funding": {"weight": 4, "expires_days": 365, "seat": "decision maker",
                 "watch": "a funding round or acquisition"},
-    "topic_intent": {"weight": 3, "expires_days": 90, "seat": "decision maker",
+    "topic_intent": {"weight": 3, "expires_days": 30, "seat": "decision maker",
                      "watch": "research interest in your topic"},
     "growth": {"weight": 2, "expires_days": 180, "seat": "decision maker",
                "watch": "a new office, site or team"},
@@ -50,7 +53,7 @@ TIMING_ONLY_TYPES = ["topic_intent"]
 RAW_COLUMNS = ["signal_id", "account_name", "domain", "type", "event_date", "summary",
                "source_url", "person_name", "person_title"]
 SCORED_COLUMNS = ["account_id", "name", "score", "top_type", "playable", "why_not", "why_now",
-                  "source_url", "event_date", "seat", "live_signals", "signals", "check"]
+                  "source_url", "event_date", "seat", "live_signals", "signals", "check", "quadrant"]
 TRACE_COLUMNS = ["raw_file", "signal_id", "account_name", "domain", "type", "event_date",
                  "summary", "source_url", "person_name", "person_title", "status", "reason",
                  "account_id", "age_days", "weight", "recency", "value", "check"]
@@ -104,6 +107,7 @@ def load_config(path):
         "blocked_status": section.get("blocked_status", DEFAULT_BLOCKED_STATUS),
         "blocked_relationships": blocked_relationships(section, icp),
         "timing_only": section.get("timing_only_types", TIMING_ONLY_TYPES),
+        "icp": icp if isinstance(icp, dict) else {},
     }
 
 
@@ -321,11 +325,19 @@ def score(workspace, today, accounts_path=None, out_dir=None, config_path=None):
             why_not.append(f"account status is {status}")
         if rel in cfg["blocked_relationships"]:
             why_not.append(f"relationship is {rel}")
+        fit_verdict, fit_reason = icp_fit(acc, cfg["icp"])
+        if fit_verdict == "out" and not fit_reason.startswith("excluded relationship"):
+            why_not.append(f"outside the ICP: {fit_reason}")
+        elif fit_verdict == "unknown":
+            why_not.append(f"fit unknown: {fit_reason}")
         if not live:
             why_not.append("no live signals (all expired)")
         elif not citable and not timing:
             why_not.append("only context signals (weight 0)")
+        elif not citable:
+            why_not.append("intent only: find a citable reason first")
         playable = not why_not
+        quadrant = QUADRANTS[(fit_verdict == "in", bool(citable))]
 
         lead = citable[0] if citable else (timing[0] if timing else None)
         if lead is None:
@@ -350,6 +362,7 @@ def score(workspace, today, accounts_path=None, out_dir=None, config_path=None):
                    "event_date": lead["event_date"], "seat": seat, "check": lead["check"]}
         row.update(account_id=aid, name=acc.get("name", ""), score=total,
                    playable="yes" if playable else "no", why_not="; ".join(why_not), why_now=why_now,
+                   quadrant=quadrant,
                    live_signals=len(live),
                    signals="; ".join(f"{s['type']}:{s['event_date']}" for s in sorted(live, key=rank)))
         scored.append(row)
@@ -366,6 +379,16 @@ def score(workspace, today, accounts_path=None, out_dir=None, config_path=None):
                                                       counts, scored, trace), encoding="utf-8")
     return {"counts": counts, "scored": scored, "trace": trace, "files": [str(f) for f in files],
             "skipped_folders": skipped_folders, "out": str(out_dir)}
+
+
+# Fit by timing: fit is the gate, a citable live signal is the timing. Status is separate.
+QUADRANTS = {(True, True): "act", (True, False): "nurture", (False, True): "verify", (False, False): "suppress"}
+QUADRANT_ACTIONS = [
+    ("act", "fits and has a citable reason now: work it if the gate allows"),
+    ("nurture", "fits but nothing citable yet: watch for a signal"),
+    ("verify", "a fresh signal but the fit is out or unknown: check the fit before any touch"),
+    ("suppress", "out or unknown fit and nothing citable: leave it"),
+]
 
 
 def render_report(today, files, workspace, skipped_folders, counts, scored, trace):
@@ -385,6 +408,10 @@ def render_report(today, files, workspace, skipped_folders, counts, scored, trac
         lines += [f"| {r['name']} | {r['score']} | {r['why_now']} | {r['seat']} |" for r in playable]
     else:
         lines.append("None.")
+    lines += ["", "## Fit by timing", "", "| Quadrant | Accounts | What to do |", "| --- | --- | --- |"]
+    for name, action in QUADRANT_ACTIONS:
+        members = [r["name"] for r in scored if r.get("quadrant") == name]
+        lines.append(f"| {name} | {', '.join(members) or 'none'} | {action} |")
     lines += ["", f"## Held ({len(held)})", ""]
     lines += [f"- {r['name']}: {r['why_not']}" for r in held] or ["None."]
     checks = [t for t in trace if t.get("check")]

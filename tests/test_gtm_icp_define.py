@@ -187,5 +187,71 @@ class MarketTests(unittest.TestCase):
         self.assertEqual(sam, icp.two_sig(4200 * (1 - 3 / 25) * 0.1 * 20000))
 
 
+class WonDealsAndReviewTests(unittest.TestCase):
+    """Oct 22 review: check the ICP against won deals, and flag a stale ICP."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.ws = Path(self.tmp.name)
+        (self.ws / "input").mkdir()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def write_cfg(self, **icp_extra):
+        cfg = copy.deepcopy(CFG)
+        cfg["icp"].update(icp_extra)
+        (self.ws / "gtm.json").write_text(json.dumps(cfg))
+
+    def test_share_of_won_deals_inside_the_icp(self):
+        self.write_cfg()
+        cols = ["account_id", "name", "employees", "industry", "country", "relationship"]
+        inside = [{"account_id": f"W{i}", "name": f"Won {i}", "employees": "500", "industry": "logistics",
+                   "country": "US", "relationship": "customer"} for i in range(7)]
+        outside = [{"account_id": "W7", "name": "Tiny Won", "employees": "40", "industry": "logistics", "country": "US"},
+                   {"account_id": "W8", "name": "Retail Won", "employees": "500", "industry": "retail", "country": "US"},
+                   {"account_id": "W9", "name": "German Won", "employees": "500", "industry": "logistics", "country": "DE"}]
+        with (self.ws / "input/won-deals.csv").open("w", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=cols)
+            w.writeheader()
+            for r in inside + outside:
+                w.writerow({c: r.get(c, "") for c in cols})
+        code, out = run(["--workspace", str(self.ws), "--out", str(self.ws / "icp"), "--today", "2026-10-22"])
+        self.assertEqual(code, 0, out)
+        self.assertIn("7 of 10 won deals inside the ICP", out)
+        report = (self.ws / "icp/icp-check.md").read_text()
+        for name in ("Tiny Won", "Retail Won", "German Won"):
+            self.assertIn(name, report)
+
+    def test_won_deals_with_only_account_id_are_looked_up(self):
+        # Oct 22 check finding: the docs promise this, but the file was rejected.
+        self.write_cfg()
+        cols = ["account_id", "name", "employees", "industry", "country"]
+        with (self.ws / "input/accounts.csv").open("w", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=cols)
+            w.writeheader()
+            w.writerow({"account_id": "W1", "name": "Good Won", "employees": "500", "industry": "logistics", "country": "US"})
+            w.writerow({"account_id": "W2", "name": "Retail Won", "employees": "500", "industry": "retail", "country": "US"})
+        (self.ws / "input/won-deals.csv").write_text("account_id\nW1\nW2\nW9\n")
+        code, out = run(["--workspace", str(self.ws), "--out", str(self.ws / "icp"), "--today", "2026-10-22"])
+        self.assertEqual(code, 0, out)
+        self.assertIn("1 of 3 won deals inside the ICP", out)
+        report = (self.ws / "icp/icp-check.md").read_text()
+        self.assertIn("Retail Won", report)
+        self.assertIn("1 unknown", out)
+        self.assertIn("W9", report)
+
+    def test_past_review_date_warns(self):
+        self.write_cfg(review_by="2026-09-30")
+        code, out = run(["--workspace", str(self.ws), "--today", "2026-10-22"])
+        self.assertEqual(code, 0, out)
+        self.assertIn("review the ICP", out)
+
+    def test_config_reference_documents_every_section(self):
+        doc = (SKILL / "references/config.md").read_text()
+        missing = [key for key in CFG if f"`{key}`" not in doc]
+        self.assertEqual(missing, [])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -40,6 +40,6 @@ Hi Dana, ...
 
 ## Verdicts
 
-- `PASS`: ready for the user to review and send.
-- `NEEDS_HUMAN`: has a `{{variable}}` gap or `status: needs_human`. Cannot be sent until a person fills it.
+- `PASS`: every check passed. Still read it and open the source before sending; the checks cannot prove every sentence true.
+- `NEEDS_HUMAN`: has a `{{variable}}` gap, `status: needs_human`, a possible seller claim with no proof, or a fact the `why_now` line does not state. Cannot be sent until a person fills or checks it.
 - `FAIL`: breaks a rule. The reason is printed under it. The script exits with code 1.

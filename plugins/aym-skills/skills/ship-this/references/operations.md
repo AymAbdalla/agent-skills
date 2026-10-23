@@ -22,6 +22,10 @@ Before pushing, run `git remote -v` and check the upstream with `git rev-parse -
 
 Build the body from `git diff <base>...HEAD --stat`, the commit messages and the checks you ran. Include what changed, why, how it was checked and known limits. Do not claim a check that did not run. Pass the body by file. The PR tool may need network access and credentials the session lacks; if creation fails, report the error and leave the pushed branch as is.
 
+## Author identity
+
+The machine's git identity can belong to a tool rather than the user (cloud sessions often set `user.name` to the assistant's name). A clean message is not enough: the author field also lands in history. When the user's own name and email are recorded in their instructions, propose those; otherwise ask. Pass the identity per command with `git -c`, so the machine's config stays unchanged. If an existing unpushed commit already carries the wrong author, report it and ask before amending.
+
 ## Hooks
 
 Repository hooks may run on commit or push. Report their output. If a hook fails, the operation did not happen; fix only within the authorized task, then rerun checks before trying again. Do not bypass hooks with `--no-verify` unless the user asks.

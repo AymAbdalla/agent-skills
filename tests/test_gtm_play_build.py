@@ -80,7 +80,8 @@ class Base(unittest.TestCase):
         write(self.ws / "signals/scored.csv", cols, rows)
 
     def play(self, **kw):
-        p = {"id": "p1", "type": "signal", "sequence": "seq-a", "start": "2026-10-21", "channel": "email"}
+        p = {"id": "p1", "type": "signal", "sequence": "seq-a", "start": "2026-10-21", "channel": "email",
+             "daily_cap": 5}
         p.update(kw)
         path = self.ws / "plays" / p["id"] / "play.json"
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -103,6 +104,100 @@ def sig(aid, score="5", top="funding", seat="decision maker", **kw):
            "event_date": "2026-10-01", "seat": seat}
     row.update(kw)
     return row
+
+
+class MissingSettingsTests(Base):
+    """D1 (Oct 22): a play with no channel, start, daily cap or sequence writes no list."""
+
+    def test_missing_settings_stop_the_run_and_name_every_key(self):
+        self.book([person("a", "A1")], [account("A1")])
+        self.signals([sig("A1")])
+        path = self.play()
+        data = json.loads(path.read_text())
+        for key in ("channel", "daily_cap"):
+            data.pop(key)
+        path.write_text(json.dumps(data))
+        with self.assertRaises(ValueError) as ctx:
+            self.run_play(path)
+        self.assertIn("channel", str(ctx.exception))
+        self.assertIn("daily_cap", str(ctx.exception))
+        self.assertFalse((self.ws / "plays/p1/enroll.csv").exists())
+
+
+class HoldoutTests(Base):
+    """An optional holdout keeps a stable share of eligible accounts untouched for comparison."""
+
+    def setUp(self):
+        super().setUp()
+        self.accts = [f"A{i:02d}" for i in range(1, 21)]
+        self.book([person(f"p{a}", a) for a in self.accts], [account(a, strategy="priority") for a in self.accts])
+
+    def expected_holdout(self, share):
+        import hashlib
+        return {a for a in self.accts
+                if int(hashlib.sha256(f"p1:{a}".encode()).hexdigest(), 16) / 16 ** 64 < share}
+
+    def test_holdout_share_is_stable_and_counted(self):
+        path = self.play(type="blitz", accounts=self.accts, channel="any", daily_cap=20, holdout_share=0.3)
+        self.run_play(path)
+        rows = self.enroll()
+        held = {r["account_id"] for r in rows.values() if r["drop_reason"].startswith("holdout")}
+        self.assertEqual(held, self.expected_holdout(0.3))
+        self.assertTrue(0 < len(held) < len(self.accts))
+        funnel = (self.ws / "plays/p1/funnel.md").read_text()
+        self.assertIn("holdout", funnel)
+        self.assertIn("The counts add up", funnel)
+        self.run_play(path)
+        again = {r["account_id"] for r in self.enroll().values() if r["drop_reason"].startswith("holdout")}
+        self.assertEqual(again, held)
+
+    def test_holdout_counts_the_seat_that_would_have_been_touched(self):
+        # Oct 22 check finding: every eligible person at a held-out account counted as holdout,
+        # while the worked side counted one seat per account. Both sides must count seats.
+        people = [person(f"{a}-{n}", a, role=r) for a in self.accts
+                  for n, r in (("dm", "decision_maker"), ("ch", "champion"), ("in", "influencer"))]
+        self.book(people, [account(a, strategy="priority") for a in self.accts])
+        self.run_play(self.play(type="blitz", accounts=self.accts, channel="any", daily_cap=60,
+                                holdout_share=0.3, per_account_cap=1))
+        rows = self.enroll()
+        held = self.expected_holdout(0.3)
+        self.assertTrue(held)
+        for a in held:
+            at = [r for r in rows.values() if r["account_id"] == a]
+            self.assertEqual([r["person_id"] for r in at if r["drop_reason"].startswith("holdout")], [f"{a}-dm"], a)
+        worked = [r for r in rows.values() if r["rank"]]
+        self.assertEqual(len(worked), len(self.accts) - len(held))
+
+    def test_an_added_person_at_a_held_out_account_stays_out(self):
+        held = sorted(self.expected_holdout(0.3))
+        self.book([person(f"p{a}", a) for a in self.accts] + [person("extra", held[0], role="influencer")],
+                  [account(a, strategy="priority") for a in self.accts])
+        write(self.ws / "plays/p1/overrides.csv", ["person_id", "action", "reason", "date"],
+              [{"person_id": "extra", "action": "add", "reason": "met at a dinner"}])
+        self.run_play(self.play(type="blitz", accounts=self.accts, channel="any", daily_cap=20, holdout_share=0.3))
+        self.assertFalse(self.enroll()["extra"]["rank"])
+        self.assertIn("extra is at a held-out account", self.report())
+
+    def test_no_holdout_by_default(self):
+        self.run_play(self.play(type="blitz", accounts=self.accts, channel="any", daily_cap=20))
+        self.assertFalse(any(r["drop_reason"].startswith("holdout") for r in self.enroll().values()))
+
+
+class LiveDealTests(Base):
+    """Oct 22 review probe: the book said re-engage, but the account had an open deal."""
+
+    def test_account_status_blocks_outbound_whatever_the_strategy(self):
+        self.book([person("a", "A1"), person("h", "A2"), person("x", "A3"), person("ok", "A4")],
+                  [account("A1", status="live_deal", strategy="re-engage", owner=""),
+                   account("A2", status="hold", strategy="automated", owner=""),
+                   account("A3", status="archived", strategy="priority", owner=""),
+                   account("A4", strategy="priority", owner="")])
+        self.run_play(self.play(type="blitz", accounts=["A1", "A2", "A3", "A4"], channel="any"))
+        rows = self.enroll()
+        self.assertIn("live_deal", rows["a"]["drop_reason"])
+        self.assertIn("hold", rows["h"]["drop_reason"])
+        self.assertIn("archived", rows["x"]["drop_reason"])
+        self.assertEqual(rows["ok"]["drop_reason"], "")
 
 
 class FunnelTests(Base):

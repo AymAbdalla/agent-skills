@@ -20,6 +20,9 @@ import sys
 from datetime import date
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from gtm_fit import fit as icp_fit  # noqa: E402  (shared ICP-fit rule, copied in four skills)
+
 DEFAULTS = {
     "icp": {
         "size": {"min": 200, "max": 2000, "sweet_min": 300, "sweet_max": 1000},
@@ -123,6 +126,25 @@ def parse_date(value):
         return None
 
 
+# LinkedIn member ids look like ACoAA... or ACwAA..., case-sensitive. A name slug such as
+# acosta-maria must not match, or it would skip the name check.
+LINKEDIN_ID = re.compile(r"^AC[a-zA-Z]AA[A-Za-z0-9_-]{4,}$")
+
+
+def linkedin_id_link(url):
+    """True for a profile link that carries an id, not a name: Sales Navigator lead links
+    and /in/ACwAA... style ids. The name check cannot judge those."""
+    if "/sales/" in url.lower():
+        return True
+    slug = url.split("?", 1)[0].rstrip("/").rsplit("/", 1)[-1]
+    return bool(LINKEDIN_ID.match(slug))
+
+
+def phone_key(raw):
+    digits = re.sub(r"\D", "", raw or "")
+    return digits[-10:] if len(digits) >= 10 else ""
+
+
 def norm_name(first, last):
     return re.sub(r"[^a-z]", "", (first or "").lower()) + "|" + re.sub(r"[^a-z]", "", (last or "").lower())
 
@@ -167,29 +189,11 @@ def account_domains(account):
     return {d for d in domains if d}
 
 
-def icp_reasons(account, cfg):
-    """Why an account is outside the ICP. Empty list means inside."""
-    icp = cfg["icp"]
-    reasons = []
-    size = to_int(account.get("employees"))
-    if size is not None and size < icp["size"]["min"]:
-        reasons.append(f"below size floor ({size} < {icp['size']['min']})")
-    if size is not None and size > icp["size"]["max"]:
-        reasons.append(f"above size ceiling ({size} > {icp['size']['max']})")
-    country = (account.get("country") or "").strip().upper()
-    if icp["countries"] and country and country not in [c.upper() for c in icp["countries"]]:
-        reasons.append(f"account country {country} outside ICP")
-    industry = (account.get("industry") or "").strip().lower()
-    if industry and industry in [i.lower() for i in icp["industries_out"]]:
-        reasons.append(f"industry excluded ({industry})")
-    elif industry and icp["industries_in"] and industry not in [i.lower() for i in icp["industries_in"]]:
-        reasons.append(f"industry not in ICP ({industry})")
-    rel = (account.get("relationship") or "").strip().lower()
-    if rel and rel in [r.lower() for r in icp["exclude_relationships"]]:
-        reasons.append(f"account is a {rel}")
+def icp_fit_check(account, cfg):
+    """(verdict, reason) from the shared fit rule. An archived account is out too."""
     if (account.get("status") or "").strip().lower() == "archived":
-        reasons.append("account archived")
-    return reasons
+        return "out", "account archived"
+    return icp_fit(account, cfg["icp"])
 
 
 def size_band(account, cfg):
@@ -256,9 +260,9 @@ def classify(person, account, cfg, today):
     stop = stop_reason(person, cfg)
     if stop:
         return "quarantine", stop, extras
-    reasons = icp_reasons(account, cfg)
-    if reasons:
-        return "quarantine", "account out of ICP: " + "; ".join(reasons), extras
+    fit_verdict, fit_reason = icp_fit_check(account, cfg)
+    if fit_verdict == "out":
+        return "quarantine", "account out of ICP: " + fit_reason, extras
     country = (person.get("country") or "").strip().upper()
     icp_countries = [c.upper() for c in cfg["icp"]["countries"]]
     if icp_countries and country and country not in icp_countries:
@@ -280,6 +284,8 @@ def classify(person, account, cfg, today):
     if region and not senior:
         return "quarantine", f"title names another region ({region}) and is not senior", extras
     extras.update(persona=persona["id"], lane=persona.get("lane", ""), role=persona.get("role", ""))
+    if fit_verdict == "unknown":
+        return "enrich", "account fit unknown: " + fit_reason, extras
 
     # 3. Channels and defects.
     defects = []
@@ -309,9 +315,10 @@ def classify(person, account, cfg, today):
     elif email_domain and domains and email_domain not in domains:
         defects.append("email_domain_mismatch")
         identity_doubt.append(f"email domain {email_domain} is not on the account")
-    slug = (person.get("linkedin_url") or "").rstrip("/").rsplit("/", 1)[-1].lower()
+    url = (person.get("linkedin_url") or "").strip()
+    slug = url.rstrip("/").rsplit("/", 1)[-1].lower()
     last = re.sub(r"[^a-z]", "", (person.get("last_name") or "").lower())
-    if slug and last and last not in re.sub(r"[^a-z]", "", slug):
+    if slug and last and not linkedin_id_link(url) and last not in re.sub(r"[^a-z]", "", slug):
         defects.append("profile_mismatch")
         identity_doubt.append("profile URL may name a different person")
     touched = parse_date(person.get("last_touch_date"))
@@ -390,11 +397,14 @@ def run(cfg, people, accounts, today, cap=None):
                 prev = stops.get(key)
                 if prev is None or rank[kind] < rank[prev[0]]:
                     stops[key] = (kind, person.get("person_id", ""), why, idx)
-    seen_id, seen_email, seen_name = {}, {}, {}
+    seen_id, seen_email, seen_name, seen_phone = {}, {}, {}, {}
     for idx, person in enumerate(people):
         pid = person.get("person_id", "")
         email = (person.get("email") or "").strip().lower()
         name_key = (norm_name(person.get("first_name"), person.get("last_name")), person.get("account_id", ""))
+        last_norm = re.sub(r"[^a-z]", "", (person.get("last_name") or "").lower())
+        phone_digits = phone_key(person.get("phone"))
+        phone_key_val = (phone_digits, last_norm, person.get("account_id", "")) if phone_digits and last_norm else None
         linked = None
         for k in person_keys(person):
             if k in stops and stops[k][3] != idx and (linked is None or rank[stops[k][0]] < rank[linked[0]]):
@@ -406,10 +416,14 @@ def run(cfg, people, accounts, today, cap=None):
             dup = f"duplicate of {seen_email[email]} (same email)"
         elif name_key[0] != "|" and name_key in seen_name:
             dup = f"possible duplicate of {seen_name[name_key]} (same name at same account)"
+        elif phone_key_val and phone_key_val in seen_phone:
+            dup = f"possible duplicate of {seen_phone[phone_key_val]} (same phone and last name at same account)"
         seen_id.setdefault(pid, pid)
         if email:
             seen_email.setdefault(email, pid)
         seen_name.setdefault(name_key, pid)
+        if phone_key_val:
+            seen_phone.setdefault(phone_key_val, pid)
         account = by_account.get(person.get("account_id", ""))
         own_stop = stop_reason(person, cfg)
         if own_stop or (linked and linked[0] in ("dnc", "left")):

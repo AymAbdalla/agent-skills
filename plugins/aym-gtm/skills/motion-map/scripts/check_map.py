@@ -15,8 +15,10 @@ Standard library only. No network. Never changes a tool, a CRM or a schedule.
 """
 
 import argparse
+import csv
 import json
 import sys
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 DEFAULTS = {
@@ -136,6 +138,51 @@ def edges(stage):
     return out
 
 
+SEND_WORDS = ("sequencer", "email", "inbox", "mailbox", "calendar", "dialer", "sms", "linkedin")
+
+
+def sends_or_books(system):
+    """A live system that sends messages or books time: marked `sends: true`, or named like one."""
+    if not isinstance(system, dict) or not system.get("live"):
+        return False
+    if "sends" in system:
+        return bool(system["sends"])
+    text = f"{system.get('id', '')} {system.get('label', '')}".lower()
+    return any(w in text for w in SEND_WORDS)
+
+
+def apply_measures(m, log_path, today, weeks=4):
+    """For stages with a `measure` block, replace volume_per_week with a count from the
+    activity log over the last `weeks` weeks. Measured stages are labelled as such."""
+    measured = [s for s in m["stages"] if isinstance(s.get("measure"), dict)]
+    if not measured or not log_path.exists():
+        return 0
+    with log_path.open(newline="", encoding="utf-8-sig") as fh:
+        rows = list(csv.DictReader(fh))
+    start = today - timedelta(weeks=weeks)
+    for s in measured:
+        rule = s["measure"]
+        outcomes = set(_list(rule.get("outcomes")))
+        n = 0
+        for r in rows:
+            try:
+                day = datetime.fromisoformat((r.get("timestamp") or "").strip()).date()
+            except ValueError:
+                continue
+            if not (start < day <= today):
+                continue
+            if rule.get("channel") and r.get("channel") != rule["channel"]:
+                continue
+            if rule.get("direction") and r.get("direction") != rule["direction"]:
+                continue
+            if outcomes and r.get("outcome") not in outcomes:
+                continue
+            n += 1
+        s["volume_per_week"] = round(n / weeks, 1)
+        s["_measured"] = True
+    return len(measured)
+
+
 def analyze(m, cfg):
     r = Result()
     stages = {s["id"]: s for s in m["stages"]}
@@ -249,6 +296,12 @@ def analyze(m, cfg):
         if s.get("waste", "none") not in WASTE:
             r.find("R0", sid, f"waste must be one of {', '.join(WASTE)}")
 
+        # Writing to a live tool that sends, books or messages can't be undone unless the map
+        # says why not (irreversible_override with a reason).
+        sends = [w for w in _list(s.get("writes")) if sends_or_books(systems.get(w))]
+        if sends and not s.get("irreversible") and not str(s.get("irreversible_override") or "").strip():
+            r.find("R2", sid, f"writes to {', '.join(sends)}, which sends or books: mark it irreversible, "
+                              "or give irreversible_override with the reason it can be undone")
         # A person commits, spends or sends.
         if s.get("irreversible"):
             if tier == "automatic":
@@ -348,7 +401,7 @@ def pick_report(m, cfg, res=None):
         row = {"id": s["id"], "name": s.get("name", s["id"]), "minutes": minutes,
                "cold": _num(s.get("cold_rate")), "wrong": risk.get("automated_wrong", "unknown"),
                "manual": risk.get("left_manual", "unknown"), "level": auto.get("level", "none"),
-               "volume": _num(s.get("volume_per_week"))}
+               "volume": _num(s.get("volume_per_week")), "measured": bool(s.get("_measured"))}
         if s["id"] in flagged:
             row["why"] = "has findings (" + ", ".join(flagged[s["id"]]) + "); fix them in checks.md and rerun"
             left_out.append(row)
@@ -523,8 +576,12 @@ def render_map(m, cfg, res):
     out += ["## Automate first", ""]
     if ready:
         p = ready[0]
+        if res is not None and any(c.startswith("G") for c, _, _ in res.findings):
+            out += ["**Provisional:** the flow has findings (G1 to G4), so this map may not show the real work. "
+                    "Fix the flow first, rerun, then trust the pick.", ""]
+        measured = " (measured from the log)" if p.get("measured") else ""
         out += [f"**{p['id']} {p['name']}**: move from level {p['level']} to {next_level(p['level'])}.", "",
-                f"- Repetitive: about {p['volume']:g} item{'' if p['volume'] == 1 else 's'} a week, "
+                f"- Repetitive: about {p['volume']:g} item{'' if p['volume'] == 1 else 's'} a week{measured}, "
                 f"about {p['minutes']:g} minutes a week by hand.",
                 f"- Where deals go cold: cold rate {p['cold']:g}.",
                 f"- Risk if automated wrong: {p['wrong']}. Risk if left manual: {p['manual']}.",
@@ -587,7 +644,12 @@ def main(argv=None):
     ap.add_argument("--map", help="map file (default <workspace>/motion/map.json)")
     ap.add_argument("--config", help="gtm.json (default <workspace>/gtm.json)")
     ap.add_argument("--out", help="folder for map.md and checks.md (default <workspace>/motion)")
+    ap.add_argument("--today", help="YYYY-MM-DD for measured volumes (default: today)")
     args = ap.parse_args(argv)
+    try:
+        today = date.fromisoformat(args.today) if args.today else date.today()
+    except ValueError:
+        ap.error("--today must be YYYY-MM-DD")
     ws = Path(args.workspace)
     map_path = Path(args.map) if args.map else ws / "motion" / "map.json"
     out_dir = Path(args.out) if args.out else ws / "motion"
@@ -600,6 +662,7 @@ def main(argv=None):
     except InputError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
+    apply_measures(m, ws / "log" / "activity.csv", today)
     res = analyze(m, cfg)
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "map.md").write_text(render_map(m, cfg, res), encoding="utf-8")
@@ -607,8 +670,10 @@ def main(argv=None):
     ready, not_ready, unknown, left_out = pick_report(m, cfg, res)
     print(f"Checked {len(m['stages'])} stages: {'clean' if res.clean else 'not clean'} "
           f"({len(res.findings)} findings, {len(res.unchecked)} unchecked, {len(res.unresolved)} unresolved).")
+    provisional = any(c.startswith("G") for c, _, _ in res.findings)
     if ready:
-        print(f"Automate first: {ready[0]['id']} {ready[0]['name']}.")
+        print(f"Automate first{' (provisional: fix the flow first)' if provisional else ''}: "
+              f"{ready[0]['id']} {ready[0]['name']}.")
     else:
         print("No step is ready to automate yet.")
     if unknown:

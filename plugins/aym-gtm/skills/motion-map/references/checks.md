@@ -10,7 +10,7 @@ A map is **clean** only with zero findings and zero unchecked items. Unresolved 
 | G4 | The start can reach every stage | cut off: the start stage can never reach these stages |
 | R0 | Values come from the allowed lists (kind, level, waste, role kind) | automation level must be one of ... |
 | R1 | Roles exist; each system has one operator; a stage writes only to systems its doer operates | rep writes to crm, but its one operator is executor |
-| R2 | A stage that can't be undone never runs automatically and names a human approval point | can't be undone and names no human approval point |
+| R2 | A stage that can't be undone never runs automatically and names a human approval point; a stage that writes to a live tool that sends or books is treated as one, unless `irreversible_override` says why not | writes to sequencer, which sends or books: mark it irreversible, or give irreversible_override |
 | R3 | The scheduled builder never writes to a live system | the scheduled builder writes to live system crm |
 | R4 | The executor never does judgment work | the executor is doing judgment work |
 | R5 | Nothing is automatic or batch while its readiness lists something missing | automated while not ready |

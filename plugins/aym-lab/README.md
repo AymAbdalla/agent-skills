@@ -8,7 +8,7 @@ Claude Code:
 
 ```
 /plugin marketplace add AymAbdalla/agent-skills
-/plugin install aym-lab@aym-skills
+/plugin install aym-lab@aymabdalla
 ```
 
 On Claude Code 2.1.275 or later, one line also works: `/plugin install aym-lab --marketplace AymAbdalla/agent-skills`.

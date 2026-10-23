@@ -1,6 +1,6 @@
 ---
 name: motion-map
-description: Map a sales motion stage by stage, check the map for broken flows and unsafe automation, and pick the one step to automate first. Writes a stage card per stage (trigger, judgment or mechanical, automation level, approval point, owner, off switch), RACI, exceptions, waste at handoffs, a readiness ladder, decision ownership, and a loop check, plus a Mermaid flow. Use when the user says "map our sales motion", "map the outbound process", "what should we automate first", "audit this GTM workflow", "is this ready to automate", or has an interview take-home or consulting audit about a sales process. Do not use for cleaning data (data-quality), building a play or list (play-build), planning the day (daily-plan) or reporting results (funnel-review). It never changes a tool, a CRM or a schedule.
+description: Map a sales motion stage by stage, check it for broken flows and unsafe automation, and pick the one step to automate first. Writes stage cards (trigger, work type, automation level, approval point, owner, off switch), RACI, waste, readiness, decision ownership, a loop check and a Mermaid flow. Use for "map our sales motion", "what should we automate first", "audit this GTM workflow", "is this ready to automate", or a take-home or audit of a sales process. Not for data, plays, plans or reports. Never changes a tool or CRM.
 ---
 
 # Motion map
@@ -26,14 +26,15 @@ If there is no map yet, draft one with the user, one question at a time, from [m
 2. **Run the check:**
    `python3 <skill-dir>/scripts/check_map.py --workspace <workspace>`
    It writes `motion/map.md` and `motion/checks.md`. Exit code 0 means clean, 1 means findings or unchecked items, 2 means the map or config could not be read.
+   Add `--today YYYY-MM-DD` when stages have a `measure` block: their weekly volume is counted from `log/activity.csv` over the last four weeks and labelled "measured from the log" instead of an estimate.
 3. **Fix the first cause, then rerun.** One broken branch can cut off several stages. Walk the user through checks.md, starting with G1 to G4 (the flow), then R2 (a person must commit, spend or send), then the rest. See [checks](references/checks.md).
 4. **Climb the readiness ladder** for the stages the user wants to automate: what can be seen today, what is missing, the cleanup order, and only then ideas. See [automation pick](references/automation-pick.md).
 5. **Settle decision ownership** with the six questions. Rules own exact facts and consequential gates; a model may own interpretation when a wrong answer is cheap and caught.
-6. **Present the pick.** Stages with findings, stages already at the top level (`draft`) and stages whose readiness is unknown are never picked; map.md says why each was left out and lists the readiness questions to answer. One step, moved up one automation level, with its two risks, the build order (by hand once, then a script or skill, then a loop, then a schedule) and the loop check it must pass before it runs on its own.
+6. **Present the pick.** While the map has any flow finding (G1 to G4), the pick is labelled provisional: the map may not show the real work, so fix the flow before trusting it. Stages with findings, stages already at the top level (`draft`) and stages whose readiness is unknown are never picked; map.md says why each was left out and lists the readiness questions to answer. One step, moved up one automation level, with its two risks, the build order (by hand once, then a script or skill, then a loop, then a schedule) and the loop check it must pass before it runs on its own.
 
 ## Rules that matter most
 
-- A person always commits, spends, sends, books or publishes. Nothing that can't be undone runs automatically.
+- A person always commits, spends, sends, books or publishes. Nothing that can't be undone runs automatically. A stage that writes to a live tool that sends or books (a sequencer, inbox, dialer or calendar, or a system marked `sends: true`) counts as irreversible unless it gives `irreversible_override` with the reason it can be undone.
 - The scheduled builder writes files only. The executor applies approved plans only and never writes copy or picks who to contact. Each system has one operator.
 - Automating a stage that is not ready makes the mess faster. Clean first.
 - Progress is judged by outcomes, not activity. A loop stops after a few runs with the same result and hands the item to a person.

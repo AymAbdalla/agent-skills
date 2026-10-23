@@ -30,6 +30,31 @@ def digest(folder):
     return h.hexdigest()
 
 
+class DefaultExpiryTests(unittest.TestCase):
+    """Defaults from the Oct 22 review: job posts expire after 60 days, intent after 30."""
+
+    def test_hiring_and_intent_expiry_defaults(self):
+        cfg = ss.load_config(None)
+        self.assertEqual(cfg["types"]["hiring"]["expires_days"], 60)
+        self.assertEqual(cfg["types"]["topic_intent"]["expires_days"], 30)
+        example = json.loads((EXAMPLE / "gtm.json").read_text())["signals"]["types"]
+        self.assertEqual((example["hiring"]["expires_days"], example["topic_intent"]["expires_days"]), (60, 30))
+
+
+class FitQuadrantTests(unittest.TestCase):
+    def test_out_of_icp_with_a_fresh_signal_is_verify(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp) / "gtm"
+            shutil.copytree(EXAMPLE, ws)
+            with (ws / "input/accounts.csv").open("a") as f:
+                f.write("A012,Govco,govco.example,,600,government,US,P1,,active,,,\n")
+            (ws / "signals/raw/2026-10-15/news-extra.csv").write_text(
+                HEADER + "S090,Govco,govco.example,funding,2026-10-10,Closed a round,https://news.example/govco,,\n")
+            rows = {r["account_id"]: r for r in ss.score(ws, TODAY)["scored"]}
+        self.assertEqual(rows["A012"]["quadrant"], "verify")
+        self.assertEqual(rows["A012"]["playable"], "no")
+
+
 class ExampleWorkspace(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -46,12 +71,12 @@ class ExampleWorkspace(unittest.TestCase):
         cls.tmp.cleanup()
 
     def test_counts(self):
-        self.assertEqual(self.result["counts"], {"read": 18, "live": 13, "expired": 1, "unmatched": 1,
+        self.assertEqual(self.result["counts"], {"read": 18, "live": 12, "expired": 2, "unmatched": 1,
                                                  "skipped": 2, "duplicate": 1})
 
     def test_best_per_type_summed_with_recency(self):
-        # new leader 22 days old (5 x 1.0) + hiring 80 days old (4 x 0.7)
-        self.assertEqual(self.rows["A001"]["score"], 7.8)
+        # new leader 22 days old (5 x 1.0); the hiring post is 80 days old, past the 60-day default
+        self.assertEqual(self.rows["A001"]["score"], 5.0)
         self.assertEqual(self.rows["A001"]["top_type"], "new_leader")
 
     def test_thirty_day_boundary_keeps_full_weight(self):
@@ -62,7 +87,7 @@ class ExampleWorkspace(unittest.TestCase):
 
     def test_expired_signal_does_not_score(self):
         expired = [t for t in self.result["trace"] if t["status"] == "expired"]
-        self.assertEqual([t["signal_id"] for t in expired], ["S013"])
+        self.assertEqual(sorted(t["signal_id"] for t in expired), ["S002", "S013"])
         self.assertEqual(self.rows["A004"]["score"], 3.0)  # only the intent signal counts
 
     def test_other_domain_and_legal_suffix_match(self):
@@ -91,8 +116,8 @@ class ExampleWorkspace(unittest.TestCase):
 
     def test_order_playable_then_score_then_id(self):
         order = [r["account_id"] for r in self.result["scored"]]
-        self.assertEqual(order[:6], ["A001", "A003", "A009", "A002", "A007", "A004"])
-        self.assertTrue(all(r["playable"] == "no" for r in self.result["scored"][6:]))
+        self.assertEqual(order[:5], ["A001", "A003", "A009", "A002", "A007"])
+        self.assertTrue(all(r["playable"] == "no" for r in self.result["scored"][5:]))
 
     def test_intent_never_cited(self):
         for r in self.result["scored"]:
@@ -100,6 +125,16 @@ class ExampleWorkspace(unittest.TestCase):
         self.assertTrue(self.rows["A004"]["why_now"].startswith("Timing only"))
         self.assertEqual(self.rows["A004"]["source_url"], "")
         self.assertEqual(self.rows["A009"]["top_type"], "funding")  # citable beats higher-value intent
+
+    def test_intent_only_account_is_held(self):
+        # D2 (Oct 22): a message needs a fact it can quote; intent is timing only.
+        self.assertEqual((self.rows["A004"]["playable"], self.rows["A004"]["why_not"]),
+                         ("no", "intent only: find a citable reason first"))
+
+    def test_fit_by_timing_quadrant(self):
+        got = {aid: self.rows[aid]["quadrant"] for aid in ("A001", "A004", "A011")}
+        self.assertEqual(got, {"A001": "act", "A004": "nurture", "A011": "nurture"})
+        self.assertIn("Fit by timing", (self.ws / "signals/report.md").read_text())
 
     def test_why_now_is_source_summary_with_date(self):
         self.assertEqual(self.rows["A002"]["why_now"],

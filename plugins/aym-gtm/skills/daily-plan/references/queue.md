@@ -10,6 +10,7 @@ A person in `book/people.csv` is a candidate when all of these hold. Each drop i
 - status not in `stop_statuses`, and no tag in `dnc_tags` or `left_tags`
 - no log outcome of `opt_out`, `not_interested`, `wrong_person` or `left`, at any time
 - the account is yours: its `owner` is blank or matches `daily.owner` (else `play.owner`, else `you`), the same rule play-build uses
+- the account's own `status` is not `live_deal`, `hold` or `archived`, whatever the book's strategy says
 - nobody at the account has replied, shown interest or booked in the last `daily.reply_lookback_days` days (a person handles that account). The account comes from the book
 - last touch at least `daily.min_days_between_touches` days ago (log and the book's `last_touch_date`)
 - a usable channel: a call (`call_ok` = yes and a phone), or LinkedIn (`linkedin_ok` = yes and a profile) when there is no phone and no email path. LinkedIn sequence steps use the same `linkedin_ok` check. A book built before `linkedin_ok` existed gets the same person and account checks here instead: stop status, opt-out or left tags, do-not-contact notes, not-buyer titles, an excluded relationship, and a held, excluded or live-deal account. Nobody blocked on email or calls for who they are or where they work is ever moved to LinkedIn.
@@ -45,7 +46,7 @@ Each candidate gets seven sub-scores from 0 to 1. The score is their weighted av
 
 ## Flat-score guard
 
-If the highest and lowest scores differ by less than `daily.flat_gap`, the scores carry no real signal. The plan says so, hides the scores, and orders each block by plain facts instead, in `daily.fact_ladder` order: inbound and untouched, never touched, buying role, seniority from the title, an open deal at the account, then newest. A ranking that looks precise but is not is worse than an honest one.
+If the highest and lowest scores differ by less than `daily.flat_gap`, the scores carry no real signal. The plan says so, hides the scores, and orders each block by plain facts instead, in `daily.fact_ladder` order: inbound and untouched, never touched, buying role, seniority from the title, then newest. A ranking that looks precise but is not is worse than an honest one.
 
 ## No prep line, no dial
 

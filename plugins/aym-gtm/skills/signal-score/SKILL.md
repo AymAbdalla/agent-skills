@@ -1,6 +1,6 @@
 ---
 name: signal-score
-description: "Score dated buying signals (new leaders, leader gaps, job posts, funding, growth, intent) per account, decide which accounts are playable now, and write one sourced why-now line and the seat to contact for each. Use when the user asks to score signals, find who to reach out to this week, rank accounts by timing, write why-now lines, or turn a pile of job posts and news into a call list. Do not use for building the ICP (icp-define), cleaning contact data (data-quality), keeping the account and person records or choosing account strategy (account-book), or writing messages (outreach-draft). It never enrolls anyone."
+description: "Score dated buying signals (new leaders, leader gaps, job posts, funding, growth, intent) per account, decide which accounts are playable now, and write one sourced why-now line and the seat to contact for each, with a fit-by-timing view. Use to score signals, find who has a real reason to hear from you this week, rank accounts by timing, write why-now lines, or turn job posts and news into a call list. Not for the ICP (icp-define), cleaning data (data-quality), the book (account-book) or messages (outreach-draft). It never enrolls anyone."
 ---
 
 # Signal score
@@ -17,7 +17,7 @@ This skill's results come from `scripts/score_signals.py`. If you cannot run the
 
 All paths are inside the GTM workspace (default `./gtm`).
 
-- `input/accounts.csv`: the accounts you own or target, with `domain`, `other_domains`, `status` and `relationship`.
+- `input/accounts.csv`: the accounts you own or target, with `domain`, `other_domains`, `status`, `relationship` and the fields the ICP uses (`employees`, `industry`, `country`, optional `tech`).
 - `signals/raw/<YYYY-MM-DD>/*.csv`: raw signal pulls, one folder per pull date, with columns `signal_id, account_name, domain, type, event_date, summary, source_url, person_name, person_title`. Keep these files exactly as pulled. The date folder is when you pulled; `event_date` is when the thing happened.
 - `gtm.json` (optional): the `signals` section sets the types, weights, expiry windows, recency bands and seats. Missing settings use the defaults in [scoring](references/scoring.md). They are starting points to tune, not standards.
 
@@ -37,7 +37,7 @@ If there are no raw pulls yet, help the user gather some first. [Gathering signa
 
 - Match by domain or other domain first, then by exact company name with legal endings like Inc or LLC removed. Never a fuzzy guess. A name or domain that fits two accounts is reported, not matched.
 - Each signal type has a weight and an expiry window counted from `event_date`. Expired signals are kept in the trace but do not score.
-- Recency multiplies the weight: 1.0 up to 30 days old, 0.7 up to 90, 0.4 after that.
+- Recency multiplies the weight: 1.0 up to 30 days old, 0.7 up to 90, 0.4 after that. Job posts expire after 60 days and research interest after 30 by default, because a role is usually filled within weeks.
 - Account score = the sum, over signal types, of that type's best weight x recency. Two job posts do not double count; a job post plus a new leader does.
 - Full math and the playable gate: [scoring](references/scoring.md).
 
@@ -47,15 +47,20 @@ An account is playable only when all of these hold:
 
 - its status is not hold, live deal or archived
 - its relationship is not one the ICP excludes (`icp.exclude_relationships` in `gtm.json`: by default competitor, customer, partner), and never a company whose parent makes the decision
-- it has at least one live signal with a weight above 0
+- it fits the ICP, by the shared fit rule (`scripts/gtm_fit.py`, the same file icp-define, data-quality and account-book use). Out is held with the reason; a blank field the rule needs is held as "fit unknown: enrich first"
+- it has at least one live signal with a weight above 0 that you can cite: research interest alone is held as "intent only: find a citable reason first"
 
-Layoffs carry weight 0. They are context, never a reason to reach out. Topic intent counts as timing, but it is never quoted or hinted at in a message. When intent is the only signal, the why-now line says so and asks for a citable reason first.
+Layoffs carry weight 0. They are context, never a reason to reach out. Topic intent counts as timing, but it is never quoted or hinted at in a message, so it never makes an account playable on its own.
+
+## Fit by timing
+
+Each scored account also gets a `quadrant`: fit is the gate, a citable live signal is the timing. `act` (fits, citable reason now), `nurture` (fits, nothing citable yet), `verify` (a fresh signal but the fit is out or unknown: check the fit first) and `suppress` (neither). Status is separate: an `act` account on hold is still not playable. The report lists the accounts in each quadrant with what to do.
 
 ## Outputs
 
-- `signals/scored.csv`: one row per account with a matched signal. Columns: `account_id, name, score, top_type, playable, why_not, why_now, source_url, event_date, seat, live_signals, signals, check`. Sorted playable first, then score, then account id. Accounts with no matched signal are not listed.
+- `signals/scored.csv`: one row per account with a matched signal. Columns: `account_id, name, score, top_type, playable, why_not, why_now, source_url, event_date, seat, live_signals, signals, check, quadrant`. Sorted playable first, then score, then account id. Accounts with no matched signal are not listed.
 - `signals/signals.csv`: every raw row with its status (live, expired, unmatched, skipped, duplicate), the reason, age, weight, recency factor, value and any check note. Any score can be traced back to its rows.
-- `signals/report.md`: counts, the playable table, held accounts with reasons, signals to check before use, rows not used, and the before-first-touch checklist.
+- `signals/report.md`: counts, the playable table, the fit-by-timing table, held accounts with reasons, signals to check before use, rows not used, and the before-first-touch checklist.
 
 ## Boundaries
 

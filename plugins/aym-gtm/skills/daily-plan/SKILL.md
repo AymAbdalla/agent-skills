@@ -1,6 +1,6 @@
 ---
 name: daily-plan
-description: Turn approved play enrollments, sequence templates and the activity log into today's work file (sequence steps due, extra calls and LinkedIn touches in a weighted queue, call slots placed by each prospect's local time), give a one-line morning nudge, and close the day so every planned card ends as done, skipped with a reason, or no record, with commitments and tomorrow's top 3. Use when the user says "plan my day", "what should I work on today", "build today's call list", "what's due in my sequences", "morning nudge", "close the day", "end of day wrap", or "what did I miss today". Do not use to choose who goes into a play (play-build), write or check message copy (outreach-draft), score accounts or signals (signal-score), build the book (account-book), sync with a CRM (crm-sync), or report results over time (funnel-review). It never sends, dials or enrolls anyone.
+description: Turn approved play enrollments, sequence templates and the activity log into today's work file (sequence steps due, extra calls and LinkedIn touches in a weighted queue, call slots in each prospect's local time), give a one-line morning nudge, and close the day so every card ends done, skipped with a reason, or no record. Use for "plan my day", "what's due in my sequences", "build today's call list", "morning nudge" or "close the day". Not for plays, copy, scoring, the book, CRM sync or results. Never sends, dials or enrolls.
 ---
 
 # Daily plan
@@ -24,9 +24,9 @@ All paths are inside the GTM workspace (default `./gtm`). `<skill-dir>` is this 
 
 ## Steps
 
-1. **Check the inputs.** Confirm the book, at least one approved enrollment or a book worth working, and the sequences file. Ask for the date if the user has not given one. Confirm `daily.user_timezone` is right; every call time depends on it.
+1. **Check the inputs.** Confirm the book, at least one approved enrollment or a book worth working, and the sequences file. With no date given, the plan uses today in `daily.user_timezone` and says so at the top; this is a read-only plan, so a stated default is fine. Confirm `daily.user_timezone` is right; every call time depends on it.
 2. **Plan the day.**
-   `python3 <skill-dir>/scripts/plan_day.py --workspace <workspace> --today YYYY-MM-DD`
+   `python3 <skill-dir>/scripts/plan_day.py --workspace <workspace> --today YYYY-MM-DD` (leave out `--today` to plan today)
    It writes `plan/YYYY-MM-DD.md` (cards with a checkbox and an outcome line) and `plan/YYYY-MM-DD.csv`. The plan uses only log rows from before today, so a rerun later in the day gives the same plan. A rerun keeps any `skip_reason` (and any column of your own) already written in the plan CSV and says how many it kept. If a card you wrote on no longer exists (the person moved to another card or was stopped), your entry is listed under "Entries kept from the last run that no longer match a card" and kept in `plan/YYYY-MM-DD-unmatched.csv`; it goes back onto its card if the card returns. The `.md` file is rewritten, so log outcomes in `log/activity.csv`, not in the `.md`.
 3. **Read it with the user, top down.** Start with "Do first". Then:
    - cards marked `needs_human`: fill the missing variable or check the time zone before they can be worked
@@ -45,9 +45,9 @@ All paths are inside the GTM workspace (default `./gtm`). `<skill-dir>` is this 
 ## How the plan is built
 
 - **Sequence steps:** step day `d` lands on the enrollment's start date plus `d - 1` business days, skipping weekends and `daily.holidays`. A step worked late pushes every later step back by the same number of business days. An overdue step is planned today with a note. One card per person per day. Detail: [sequence math](references/sequence-math.md). Email cards are filled from the template and say "copy: filled from the template; read it before sending". To check that copy, run outreach-draft's copy lint on it yourself; this skill never runs another skill's script.
-- **Stops:** a stop status, an opt-out or left tag, an opt out, not interested, wrong person or left outcome at any time, an account owned by someone else, or a replied, interested, not now, booked or bounced outcome since the start ends the person's sequence. A reply or meeting from anyone at the account (the book's account, looking back `daily.reply_lookback_days`) stops every sequence there.
+- **Stops:** a stop status, an opt-out or left tag, an opt out, not interested, wrong person or left outcome at any time, an account owned by someone else, an account whose own `status` is `live_deal`, `hold` or `archived` (checked even when the book's strategy says otherwise), or a replied, interested, not now, booked or bounced outcome since the start ends the person's sequence. A reply or meeting from anyone at the account (the book's account, looking back `daily.reply_lookback_days`) stops every sequence there.
 - **Extra touches:** people in the book who are not in a sequence, pass the book's call or LinkedIn gate, have no lasting stop outcome in the log, and are at accounts you own, get a weighted score. Each account's slot goes to the best candidate, and a callable buyer beats a LinkedIn-only person. Cards are then shown in blocks: inbound never worked, warm, LinkedIn only, volume. When the scores are too close to mean anything, the plan says so and orders by plain facts instead. Detail: [queue](references/queue.md).
-- **Call slots:** calls fill your call blocks, first inside the prospect's preferred hours, then anywhere inside 8am to 9pm their time. Busy times from your calendar are removed. A call with an unknown time zone needs a human. Detail: [call blocks](references/call-blocks.md).
+- **Call slots:** calls fill your call blocks, first inside the prospect's preferred hours, then anywhere inside the default calling window, 8am to 9pm their time. That window is the US federal default for telemarketing; some states are stricter, so set `daily.call_window` for where you call. Busy times from your calendar are removed. A call with an unknown time zone needs a human. Detail: [call blocks](references/call-blocks.md).
 
 ## Boundaries
 
@@ -58,4 +58,4 @@ All paths are inside the GTM workspace (default `./gtm`). `<skill-dir>` is this 
 
 ## Report
 
-After planning: the "Do first" line, card counts by block, needs-you items, skipped steps, stopped sequences and data problems, and the file paths. After closing: done, skipped, carried and no-record counts, commitments, tomorrow's top 3, and what is still unresolved. Say plainly that nothing was sent, dialed or enrolled.
+After planning: the date used (and that it was today by default, when no date was given), the "Do first" line, card counts by block, needs-you items, skipped steps, stopped sequences and data problems, and the file paths, including `plan/<date>-unmatched.csv` when it was written. After closing: done, skipped, carried and no-record counts, commitments, tomorrow's top 3, and what is still unresolved. Say plainly that nothing was sent, dialed or enrolled.

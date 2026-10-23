@@ -58,8 +58,9 @@ DEFAULT_SYNC = {
 
 BOOK_STATUSES = ["active", "nurture", "hold", "booked", "not_interested", "wrong_person", "left",
                  "do_not_contact", "archived"]
-PLAN_FILES = ["to-crm.csv", "to-book.csv", "to-book-reasons.csv", "to-log.csv", "conflicts.csv", "review.csv",
-              "cadence.csv", "report.md"]
+PLAN_FILES = ["to-crm.csv", "to-book.csv", "to-book-reasons.csv", "to-book-accounts.csv", "to-log.csv",
+              "conflicts.csv", "review.csv", "cadence.csv", "report.md"]
+ACCT_UPDATE_COLS = ["account_id", "crm_id", "status", "owner", "relationship", "reason"]
 
 PROTECTED = ("input", "log", "book", "signals", "outreach", "clean")
 TO_CRM_COLS = ["row_id", "action", "object", "record_id", "field", "current_value", "new_value",
@@ -184,6 +185,7 @@ def fingerprint(workspace, exp):
     """One hash over every input this run reads. Same inputs, same plan."""
     h = hashlib.sha256()
     for path in [exp / "people.csv", exp / "accounts.csv", exp / "activity.csv", exp / "bounces.csv",
+                 exp / "opportunities.csv",
                  workspace / "log/activity.csv", workspace / "book/people.csv", workspace / "book/accounts.csv",
                  workspace / "gtm.json"]:
         h.update(str(path.relative_to(workspace)).encode())
@@ -384,7 +386,7 @@ def three_way(plan, obj, key, person, crm_row, fields, fmap, base, book_ts, crm_
     return agreed
 
 
-def run(workspace, today, rung="plan", out=None):
+def run(workspace, today, rung="plan", out=None, mapping_confirmed=False):
     workspace = Path(workspace).resolve()
     out = Path(out).resolve() if out else workspace / "sync"
     for name in PROTECTED:
@@ -410,6 +412,7 @@ def run(workspace, today, rung="plan", out=None):
         mark_stale(out)
         raise ValueError("input/crm-export/people.csv is missing: export people from your CRM first")
     _, crm_accounts = read_csv(exp / "accounts.csv")
+    _, opportunities = read_csv(exp / "opportunities.csv")
     _, crm_activity = read_csv(exp / "activity.csv")
     _, crm_bounces = read_csv(exp / "bounces.csv")
     log_cols, log_rows = read_csv(workspace / "log/activity.csv")
@@ -429,7 +432,8 @@ def run(workspace, today, rung="plan", out=None):
 
     # Row floors: a short export would look like mass deletion.
     datasets = {"people": (exp / "people.csv", crm_people), "accounts": (exp / "accounts.csv", crm_accounts),
-                "activity": (exp / "activity.csv", crm_activity), "bounces": (exp / "bounces.csv", crm_bounces)}
+                "activity": (exp / "activity.csv", crm_activity), "bounces": (exp / "bounces.csv", crm_bounces),
+                "opportunities": (exp / "opportunities.csv", opportunities)}
     ds_state, floor_trips, unchanged = {}, [], []
     for name, (path, rows) in datasets.items():
         if not path.exists():
@@ -439,7 +443,7 @@ def run(workspace, today, rung="plan", out=None):
         ds_state[name] = {"hash": h, "rows": len(rows)}
         if prev.get("hash") == h:
             unchanged.append(name)
-        if name in ("people", "accounts") and prev.get("rows"):
+        if name in ("people", "accounts", "opportunities") and prev.get("rows"):
             floor = int(prev["rows"] * sync["row_floor_share"])
             if len(rows) < floor:
                 floor_trips.append(f"{name}.csv has {len(rows)} rows; the last export had {prev['rows']} "
@@ -822,6 +826,8 @@ def run(workspace, today, rung="plan", out=None):
     book_cols = ["person_id", "account_id", "crm_id"] + [f for f in sync["fields"] if f not in ("crm_id",)] + ["tags"]
     write_csv(out / "to-book.csv", sorted(plan.to_book.values(), key=lambda r: (r.get("person_id") == "", r.get("person_id"), r.get("crm_id"))), book_cols)
     write_csv(out / "to-book-reasons.csv", plan.reasons, REASON_COLS)
+    plan.account_updates, plan.live_kept = account_updates(accounts, crm_accounts, opportunities, cols)
+    write_csv(out / "to-book-accounts.csv", plan.account_updates, ACCT_UPDATE_COLS)
     write_csv(out / "to-log.csv", sorted(plan.to_log, key=lambda r: (r["timestamp"], r["activity_id"])), LOG_COLS)
     write_csv(out / "conflicts.csv", plan.conflicts, CONFLICT_COLS)
     write_csv(out / "review.csv", plan.review, REVIEW_COLS)
@@ -858,8 +864,60 @@ def run(workspace, today, rung="plan", out=None):
     }
     assert summary["matched"] + summary["new_in_crm"] + summary["review_people"] == len(crm_people), \
         "every export row must be accounted for"
-    write_report(out, plan, summary, sync, rung, copy_result, wm_problem, today)
+    write_report(out, plan, summary, sync, rung, copy_result, wm_problem, today, mapping_confirmed)
     return summary
+
+
+ACCOUNT_STATUSES = ("active", "hold", "live_deal", "archived")
+CLOSED_WORDS = ("true", "yes", "1", "closed", "y")
+
+
+def account_updates(accounts, crm_accounts, opportunities, cols):
+    """Account status, owner and relationship from the CRM, for account-book's
+    input/account-updates.csv. The CRM is the record for these three fields.
+    An open opportunity sets live_deal. A book live_deal goes back to active only
+    when the export has that account's opportunities and every one is closed; an
+    account missing from the export stays live_deal (a partial export must not
+    reopen outbound) and is listed in `kept`. A blank never clears.
+    Returns (rows, kept)."""
+    by_crm = {a.get("crm_id"): a for a in accounts if a.get("crm_id")}
+    rows, kept = {}, []
+
+    def put(acct, field, value, reason):
+        if not value or value == acct.get(field, ""):
+            return
+        row = rows.setdefault(acct["account_id"], {"account_id": acct["account_id"],
+                                                   "crm_id": acct.get("crm_id", ""), "reason": ""})
+        row[field] = value
+        row["reason"] = "; ".join(x for x in (row["reason"], reason) if x)
+
+    for c in crm_accounts:
+        acct = by_crm.get(c.get(cols["id"], ""))
+        if acct is None:
+            continue
+        put(acct, "owner", (c.get("owner") or "").strip(), "CRM account owner")
+        put(acct, "relationship", (c.get("relationship") or "").strip().lower(), "CRM account relationship")
+        status = (c.get("status") or "").strip().lower().replace(" ", "_")
+        if status in ACCOUNT_STATUSES:
+            put(acct, "status", status, "CRM account status")
+    if opportunities:
+        open_by_acct, seen = {}, set()
+        for o in opportunities:
+            seen.add(o.get("account_crm_id", ""))
+            if (o.get("is_closed") or "").strip().lower() in CLOSED_WORDS:
+                continue
+            open_by_acct.setdefault(o.get("account_crm_id", ""), []).append(o)
+        for cid, acct in by_crm.items():
+            opps = open_by_acct.get(cid)
+            if opps:
+                names = ", ".join(f"{o.get('opportunity_id', '?')} ({o.get('stage', 'no stage')})" for o in opps)
+                put(acct, "status", "live_deal", f"open opportunity {names}: the deal owner leads")
+            elif (acct.get("status") or "").strip().lower() == "live_deal":
+                if cid in seen:
+                    put(acct, "status", "active", "no open opportunity in the export: the deal closed")
+                else:
+                    kept.append(acct["account_id"])
+    return sorted(rows.values(), key=lambda r: r["account_id"]), sorted(kept)
 
 
 def tag_planned(plan, pid, tag):
@@ -950,8 +1008,12 @@ def apply_to_copy(out, crm_people, cols_in, to_crm, cols):
     return counts
 
 
-def write_report(out, plan, s, sync, rung, copy_result, wm_problem, today):
-    lines = [f"# CRM sync plan {today.isoformat()}", "", "## Needs you", ""]
+def write_report(out, plan, s, sync, rung, copy_result, wm_problem, today, mapping_confirmed=False):
+    lines = [f"# CRM sync plan {today.isoformat()}", ""]
+    if not mapping_confirmed:
+        lines += ["**Mapping unconfirmed:** this plan uses the field mapping in gtm.json (table below). Confirm "
+                  "it before applying any row; a wrong mapping writes good data into the wrong field.", ""]
+    lines += ["## Needs you", ""]
     needs = []
     unknown = [r for r in plan.review if r["issue"] == "unknown CRM status"]
     if unknown:
@@ -977,6 +1039,17 @@ def write_report(out, plan, s, sync, rung, copy_result, wm_problem, today):
     if status_rows:
         needs.append(f"Set {len(status_rows)} status change(s) in `book/people.csv` yourself (listed in "
                      "`to-book-reasons.csv`). account-book only takes do-not-contact from a source file.")
+    acct_updates = getattr(plan, "account_updates", [])
+    if acct_updates:
+        live = [r["account_id"] for r in acct_updates if r.get("status") == "live_deal"]
+        needs.append(f"Copy `to-book-accounts.csv` to `input/account-updates.csv` and rebuild the book: "
+                     f"{len(acct_updates)} account change(s) from the CRM."
+                     + (f" Open deals at {', '.join(live)}: outbound stops there once the book is rebuilt." if live else ""))
+    kept = getattr(plan, "live_kept", [])
+    if kept:
+        needs.append(f"Live deal kept at {', '.join(kept)}: the opportunities export has no row for "
+                     + ("it" if len(kept) == 1 else "them")
+                     + ". Outbound stays off until an export shows the deal closed. Check the export is complete.")
     if plan.to_log:
         needs.append(f"Append the {len(plan.to_log)} row(s) in `to-log.csv` to `log/activity.csv`.")
     if wm_problem:
@@ -1014,13 +1087,15 @@ def main(argv=None):
     ap.add_argument("--today", required=True, help="YYYY-MM-DD")
     ap.add_argument("--rung", default="plan", help="plan (default) or copy")
     ap.add_argument("--out", help="output folder (default <workspace>/sync)")
+    ap.add_argument("--mapping-confirmed", action="store_true",
+                    help="the user confirmed the field mapping (otherwise the report says it is unconfirmed)")
     args = ap.parse_args(argv)
     try:
         today = date.fromisoformat(args.today)
     except ValueError:
         ap.error("--today must be YYYY-MM-DD")
     try:
-        s = run(args.workspace, today, args.rung, args.out)
+        s = run(args.workspace, today, args.rung, args.out, mapping_confirmed=args.mapping_confirmed)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2

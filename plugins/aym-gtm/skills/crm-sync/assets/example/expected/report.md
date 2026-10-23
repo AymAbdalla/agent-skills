@@ -1,5 +1,7 @@
 # CRM sync plan 2026-10-20
 
+**Mapping unconfirmed:** this plan uses the field mapping in gtm.json (table below). Confirm it before applying any row; a wrong mapping writes good data into the wrong field.
+
 ## Needs you
 
 - Settle 1 conflict(s) in `conflicts.csv`: both sides changed and nothing says which is newer.

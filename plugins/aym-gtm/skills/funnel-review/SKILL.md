@@ -1,6 +1,6 @@
 ---
 name: funnel-review
-description: "Review outbound results honestly from the activity log: touches, connects, conversations, reply and meeting rates with sample sizes and 95% ranges, results by segment on the right denominator, a volume/rate/mix split of why meetings moved, pre-registered opener and email-angle tests, and the quota worked backwards from the meeting target. Ends with at most three sized actions or 'Nothing needs to change.' Use when the user asks how outbound is doing, for a weekly or monthly funnel review, whether an opener or angle test has a winner, why meetings went up or down, or how many touches a day the target needs. Do not use for deal-stage pipeline or forecast categories, logging activity, planning the day (daily-plan), or building plays (play-build). It never sends anything or changes any system."
+description: "Review outbound results honestly from the activity log: reply, meeting and call rates with sample sizes and 95% ranges, results by segment, meetings by first-touch week, a volume/rate/mix split of why meetings moved, pre-registered tests, play holdouts and the quota worked back from the target. Ends with at most three sized actions or 'Nothing needs to change.' Use for how outbound is doing, a periodic review, a test winner, or why meetings moved. Not for deal pipeline or forecasts, logging, daily plans or plays. Never sends or changes anything."
 ---
 
 # Funnel review
@@ -17,9 +17,9 @@ This skill's results come from `scripts/funnel_report.py`. If you cannot run the
 
 All paths are inside the GTM workspace (default `./gtm`).
 
-- `log/activity.csv` (required): one row per touch or outcome, in the shared log format.
+- `log/activity.csv` (required): one row per touch or outcome, in the shared log format described in [formulas](references/formulas.md#the-activity-log), with the rows this skill counts in [what counts as what](references/formulas.md#what-counts-as-what).
 - `book/people.csv` and `book/accounts.csv` (optional): used to put each person in a segment.
-- `plays/*/enroll.csv` (optional): approved enrollments, used to credit plays.
+- `plays/*/enroll.csv` (optional): approved enrollments, used to credit plays, and holdout rows from play-build, used to compare a play with the accounts it left alone.
 - `funnel/tests.json` (optional): opener and angle tests, written before results came in.
 - `funnel/targets.json` (optional): commit and stretch meeting targets.
 - `funnel/changes.csv` (optional): `date, change, area` for every change to copy, scripts, lists or timing.
@@ -27,15 +27,16 @@ All paths are inside the GTM workspace (default `./gtm`).
 
 ## Steps
 
-1. **Check the log.** Confirm `log/activity.csv` exists. Ask for the period length (7 or 30 days is usual) and the last day. Use today for a live review.
+1. **Check the log.** Confirm `log/activity.csv` exists. Use the period and last day the user names. With none named, use 30 days ending today and say so in the report: it is read-only, so a stated default is fine.
 2. **Run the review.** `<skill-dir>` is this skill's folder; `<workspace>` is the user's GTM workspace.
    `python3 <skill-dir>/scripts/funnel_report.py --workspace <workspace> --today YYYY-MM-DD --period-days 30`
    It writes `funnel/report-<today>.md` and `funnel/metrics-<today>.csv`.
 3. **Read the data checks first.** Excluded rows (blank or future timestamps, unknown values, no person) and incomplete rows tell you how far to trust the rest. If logging gaps are large, fixing the log comes before any other conclusion.
 4. **Read each number with its label.** Only "measured" rates get a percentage. Everything else is "N of M". See [formulas](references/formulas.md) for every formula, denominator and floor.
-5. **Explain movement carefully.** Use the volume/rate/mix table for why meetings moved; meetings from a brand-new segment sit on their own line. Give the count and the cause separate confidence, list other possible causes, and credit no single change when several shipped together. See [explaining movement](references/explaining-movement.md).
-6. **Read the tests.** A leader is named only when every arm has its minimum, and "clear" only when the ranges do not overlap. Rows where the caller used a different arm than the person was assigned are reported apart. See [tests and quota](references/tests-and-quota.md).
-7. **Hand off the actions.** At most three, each with its number and size, or "Nothing needs to change." Never pad to three.
+5. **Read lagged meetings and cohorts.** Meetings often land weeks after the first touch. "Booked from earlier touches" counts meetings this period from people first touched before it, kept out of the rate. The cohort table groups people by the week of their first touch; judge only weeks marked mature. See [formulas](references/formulas.md#lag-and-cohorts).
+6. **Explain movement carefully.** Use the volume/rate/mix table for why meetings moved; meetings from a brand-new segment sit on their own line. Give the count and the cause separate confidence, list other possible causes, and credit no single change when several shipped together. See [explaining movement](references/explaining-movement.md).
+7. **Read the tests and holdouts.** A leader is named only when every arm has its minimum, and "clear" only when the ranges do not overlap. Rows where the caller used a different arm than the person was assigned are reported apart. A play with a holdout shows its meeting rate next to the holdout's; only non-overlapping ranges count as a clear difference. See [tests and quota](references/tests-and-quota.md).
+8. **Hand off the actions.** At most three, each with its number and size, or "Nothing needs to change." Never pad to three.
 
 When the user wants a new test, write it into `funnel/tests.json` with them before any calls or emails go out: one variable, the arms, the metric, the minimum per arm, today as `registered`, and a start date.
 
@@ -49,8 +50,8 @@ When the user wants a new test, write it into `funnel/tests.json` with them befo
 
 ## Outputs
 
-- `funnel/report-<today>.md`: scope and limits, headline numbers (prior vs current), the segment table, why meetings moved, tests, quota and levers, patterns, data checks, actions.
-- `funnel/metrics-<today>.csv`: one row per rate with `period, scope, metric, numerator, denominator, rate, ci_low, ci_high, label`.
+- `funnel/report-<today>.md`: scope and limits, headline numbers (prior vs current, including meetings booked from earlier touches), the segment table, the cohort table, play holdouts, why meetings moved, tests, quota and levers, patterns, data checks, actions.
+- `funnel/metrics-<today>.csv`: one row per rate (overall, segment, test and cohort week) with `period, scope, metric, numerator, denominator, rate, ci_low, ci_high, label`.
 
 ## Boundaries
 

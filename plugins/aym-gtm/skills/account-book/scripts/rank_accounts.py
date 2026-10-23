@@ -15,6 +15,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from gtm_fit import fit_points  # noqa: E402  (shared ICP-fit rule, copied in four skills)
+
 DEFAULT_RANKING = {
     "top_n": 10,
     "tier_points": {"P1": 3, "P2": 2, "P3": 1},
@@ -25,6 +28,8 @@ DEFAULT_RANKING = {
     "bonus_lanes": {"tech": 1},
     "signal_points": 2,
     "never_rank_strategies": ["hold", "excluded", "live"],
+    # Fit is value, staffing is effort: a great fit should beat a well-staffed poor fit.
+    "fit_points": {"sweet_spot": 5, "in_band": 0, "segment_match": 2},
 }
 
 
@@ -40,6 +45,8 @@ def load_ranking(workspace):
     cfg = json.loads(path.read_text()) if path.exists() else {}
     rank = dict(DEFAULT_RANKING)
     rank.update(cfg.get("ranking", {}))
+    rank["fit_points"] = dict(DEFAULT_RANKING["fit_points"], **cfg.get("ranking", {}).get("fit_points", {}))
+    rank["_cfg"] = cfg
     # Never rank an account the ICP excludes (icp.exclude_relationships), one the
     # user excludes in ranking.never_rank_relationships, or one where a parent decides.
     excluded = cfg.get("icp", {}).get("exclude_relationships", ["competitor", "customer", "partner"])
@@ -73,6 +80,10 @@ def points(acct, rank, playable):
         if lane in lanes:
             total += bonus
             why.append(f"{lane} contact +{bonus}")
+    fit, detail = fit_points(acct, rank.get("_cfg", {}), rank["fit_points"])
+    if fit:
+        total += fit
+        why.append(f"ICP fit +{fit:g} ({detail})")
     if acct["account_id"] in playable:
         total += rank["signal_points"]
         why.append(f"playable signal +{rank['signal_points']}")

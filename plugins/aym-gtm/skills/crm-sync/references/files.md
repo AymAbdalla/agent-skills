@@ -12,6 +12,10 @@
 
 **`input/crm-export/bounces.csv`** (optional): `crm_id, email, timestamp, reason`.
 
+**`input/crm-export/opportunities.csv`** (optional): `opportunity_id, account_crm_id, stage, is_closed, owner, updated_at`. Any opportunity whose `is_closed` is not true, yes, 1 or closed is open. With this file, an account with an open opportunity is planned as `live_deal`, and a book account marked `live_deal` goes back to `active` only when the file has that account's opportunities and all of them are closed. A `live_deal` account with no row in the file stays `live_deal` and is named in the report, so a partial export never reopens outbound. Without it, `live_deal` is left alone. The column names are this skill's own; map your CRM's export to them in a copy.
+
+The accounts export may also carry `owner`, `relationship` and `status` (active, hold, live_deal or archived). Non-blank values that differ from the book go to `to-book-accounts.csv`.
+
 **`log/activity.csv`**: the shared log, `activity_id, timestamp, person_id, account_id, channel, direction, sequence, step, play_id, angle, opener, outcome, notes, source`.
 
 **`book/people.csv`**: from account-book. An optional `updated_at` column lets the book side win a both-changed field when its change is newer.
@@ -23,6 +27,7 @@
 | `to-crm.csv` | `row_id, action, object, record_id, field, current_value, new_value, reason, evidence, pilot` | The CRM plan. `action` is update, create or log. `pilot` is `yes` on the first rows. |
 | `to-book.csv` | `person_id, account_id, crm_id`, the mapped fields, `tags` | A source file for account-book. Only changed fields are filled; blanks change nothing. New people from the CRM have a blank `person_id`. |
 | `to-book-reasons.csv` | `person_id, crm_id, field, book_value, new_value, reason` | Why each book change is there. |
+| `to-book-accounts.csv` | `account_id, crm_id, status, owner, relationship, reason` | Account changes from the CRM. Copy it to `input/account-updates.csv` for account-book. |
 | `to-log.csv` | the log columns | CRM activity to append to `log/activity.csv`, with `source` set to `import`. |
 | `conflicts.csv` | `object, record_id, person_id, field, book_value, crm_value, baseline, book_time, crm_time, reason` | Both sides changed and nothing says which is newer. |
 | `review.csv` | `review_id, object, record_id, issue, detail` | Anything the sync refused to guess. |

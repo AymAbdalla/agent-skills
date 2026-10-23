@@ -4,9 +4,20 @@ Every number in the report comes from one of the formulas below. They are writte
 
 ## Periods
 
-- Current period: the `--period-days` days ending on `--today`, both ends counted.
+- Current period: the `--period-days` days (default 30) ending on `--today`, both ends counted.
 - Prior period: the same number of days just before it.
 - A row belongs to the day in its own timestamp offset. `2026-10-20T23:30:00-04:00` is October 20.
+
+## The activity log
+
+`log/activity.csv`, shared by daily-plan, outreach-draft, crm-sync and this skill:
+
+`activity_id, timestamp, person_id, account_id, channel, direction, sequence, step, play_id, angle, opener, outcome, notes, source`
+
+- `timestamp`: ISO 8601 with a UTC offset, such as `2026-10-20T14:05:00-04:00`.
+- `channel`: `email`, `call`, `linkedin` or `meeting`. `direction`: `out` or `in`.
+- `outcome`: `sent`, `connected`, `no_answer`, `voicemail`, `bad_number`, `gatekeeper`, `replied`, `interested`, `not_now`, `not_interested`, `booked`, `bounced`, `opt_out`, `wrong_person` or `left`.
+- `angle` (emails) and `opener` (calls) name the arm used, for tests. `play_id` credits a play.
 
 ## What counts as what
 
@@ -22,6 +33,13 @@ The activity log columns and allowed values are in the shared layout (`log/activ
 | email engagement | channel email with outcome `replied`, `interested`, `not_now`, `not_interested` or `booked` |
 | booked | any row with outcome `booked` |
 | bounce | a person emailed in the period whose email `bounced` row comes after their first send in the period, counted once per person |
+
+## Lag and cohorts
+
+A meeting often lands days or weeks after the first touch, so a calendar period can miss it.
+
+- **Booked from earlier touches:** people booked in the period who were not touched in it, but were touched in the `funnel.lag_lookback_days` (default 30) before it. Shown in the headline table, kept out of every rate.
+- **Cohorts:** each person counts once, in the week (Monday to Sunday) of their first outbound touch in the log, with every meeting booked since. The table covers the last `funnel.cohort_weeks` (default 8) weeks. A week is mature `funnel.cohort_maturation_days` (default 21) days after its last day; judge only mature weeks, because younger ones are still filling. Rates use the same floors and ranges as everything else.
 
 ## Rates
 

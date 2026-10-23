@@ -1,6 +1,6 @@
 ---
 name: work-my-way
-description: Default entry point for any actionable work, such as building, fixing, clarifying, planning, checking, shipping, pausing or resuming. Sizes the job, clarifies only consequential choices, routes each phase to the right aym-skills skill, and stops after every phase with a next-step card. Use when the user asks to clarify, scope or think through requirements, or describes work without naming a skill. A named skill keeps its own entry point; a simple factual question needs no coordinator.
+description: "Use first whenever the user describes work to do or wants to think it through (an idea to scope, a feature to add, or something to fix, plan, check, ship, pause or resume), even when no skill is named. Doing it by hand skips the user's required workflow, which is to check the project's records before asking, ask consequential questions one at a time, route each phase to the right skill (aym-lab for skill building and dissections), and stop after every phase with a status card. Not for a plain factual question or a request that names another skill."
 ---
 
 # Work my way
@@ -44,7 +44,7 @@ For multi-session work, a substantial handoff or a review of settled changes, re
    - **Checkable fact.** Look it up and cite the source. Never ask the user for a fact you can check.
    - **Consequential choice.** It changes visible behavior, scope, data handling, cost, or something hard to undo. These go to the user. Two choices always count when the request leaves them open: which items a feature covers (when the request, the docs and the code describe the set differently), and the format of output other people or systems will consume.
    - **Minor detail.** Any reasonable answer works and it is cheap to change later. Pick a default and state it.
-3. Ask every consequential choice whose prerequisites are settled in one round. Give the options, what each changes, and your recommendation with its reason. Hold a choice that depends on an unanswered one. Read [clarify.md](references/clarify.md) for the question test, approach comparison and terms.
+3. Ask the consequential choices one at a time, most consequential first, as the house rules say. For each, give the options, what each changes, and your recommendation with its reason. Hold a choice that depends on an unanswered one. List the remaining questions in the report so the user sees what is still coming. Read [clarify.md](references/clarify.md) for the question test, approach comparison and terms.
 4. Report the settlement: settled answers and facts with their sources, agreed terms, the defaults you chose, and open questions with what each blocks. Then show the stop card with Plan as the next phase.
 
 Clarify does not write the spec, plan or code, even when the same message asks. It names that next phase on the card.

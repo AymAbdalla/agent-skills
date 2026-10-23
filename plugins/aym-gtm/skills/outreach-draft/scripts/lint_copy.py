@@ -14,6 +14,7 @@ import datetime as dt
 import json
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 DEFAULT_COPY = {
@@ -28,6 +29,18 @@ DEFAULT_COPY = {
     "connect_note_max_chars": 300,
     "proof_max_age_days": 365,
     "angles": [],
+    # Truth checks (Oct 22 review). Each list is an editable default in gtm.json `copy`.
+    "intent_words": ["researching", "been looking into", "been looking at", "visited our",
+                     "on our website", "your team has been reading", "intent data", "in-market",
+                     "showed interest in"],
+    # Phrases that contain a number word but claim no number ("second half of the year").
+    "number_ok_phrases": ["first half", "second half"],
+    "number_words": ["two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "dozen",
+                     "twice", "double", "doubled", "triple", "tripled", "half", "percent"],
+    "claim_phrases": ["teams we work with", "teams like yours", "companies like yours", "our customers",
+                      "our clients", "customers see", "we help", "we helped", "most teams we"],
+    "fact_words": ["raised", "funding", "round", "acquired", "acquisition", "named", "appointed", "hired",
+                   "hire", "promoted", "joined", "ipo", "launched", "expanded"],
 }
 
 DASH = re.compile("[\u2014\u2013]| -- ")
@@ -38,6 +51,14 @@ WORD = re.compile(r"[A-Za-z0-9][A-Za-z0-9'’&./-]*")
 NUMBER = re.compile(r"\d[\d,.]*")
 ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 FIELD = re.compile(r"^-\s+([a-z_]+):\s*(.*)$")
+GREETING = re.compile(r"^(?:hi|hello|hey|dear)\s+([^\W\d_][\w'’-]*)\s*[,.!]", re.I)
+# "Hi there" and "Hi team" greet nobody in particular: no name to check.
+GENERIC_GREETINGS = {"there", "team", "all", "everyone", "folks", "both"}
+# Short forms that are not a prefix of the full name. A prefix ("Rob" for Robert) is always fine.
+NICKNAMES = {"bob": "robert", "bill": "william", "liz": "elizabeth", "beth": "elizabeth",
+             "betty": "elizabeth", "kate": "katherine", "katie": "katherine", "jim": "james",
+             "jack": "john", "dick": "richard", "peggy": "margaret", "maggie": "margaret",
+             "chuck": "charles", "ted": "edward", "ned": "edward", "hank": "henry", "sasha": "alexander"}
 SENT = re.compile(r"^-\s+\[( |x|X)\]\s+sent\s*$")
 CHANNELS = {"email", "linkedin", "call"}
 THREADS = {"new", "reply"}
@@ -194,6 +215,81 @@ def check_proof(proof_ids, persona, registry, rules, today):
     return fails, warns, texts
 
 
+def _has_word(text, phrase):
+    """The phrase as whole words. A hyphen joins words, so 'two' is not found in
+    'two-minute' and 'round' is not found in 'year-round'."""
+    return re.search(r"(?<![A-Za-z-])" + re.escape(phrase.lower()) + r"(?![A-Za-z-])", text.lower()) is not None
+
+
+def _fold(name):
+    """Lowercase without accents, so José and Jose are the same name."""
+    return "".join(c for c in unicodedata.normalize("NFKD", name) if not unicodedata.combining(c)).lower()
+
+
+def _same_person(greeted, first):
+    g, f = _fold(greeted), _fold(first)
+    return g == f or (len(g) >= 3 and f.startswith(g)) or NICKNAMES.get(g) == f
+
+
+def check_truth(body, f, heading, rules, proof_ids, allowed_texts):
+    """Checks that look at what the message claims, not only how it reads.
+    Returns (fails, holds): holds make the draft NEEDS_HUMAN, never PASS."""
+    fails, holds = [], []
+    text = VAR.sub("", body)
+    for phrase in rules.get("intent_words", []):
+        if _has_word(text, phrase):
+            fails.append(f"hints at research interest ('{phrase}'): intent is timing only, never mentioned")
+            break
+    backing = " ".join(allowed_texts).lower()
+    counted = text
+    for phrase in rules.get("number_ok_phrases", []):
+        counted = re.sub(re.escape(phrase), " ", counted, flags=re.I)
+    for word in rules.get("number_words", []):
+        if _has_word(counted, word) and not _has_word(backing, word):
+            fails.append(f"number word '{word}' is not in the proof line or the sourced fact")
+    if not proof_ids:
+        for phrase in rules.get("claim_phrases", []):
+            if _has_word(text, phrase):
+                holds.append(f"possible seller claim ('{phrase}') with no proof: add a VERIFIED proof or cut it")
+                break
+    why = f.get("why_now", "")
+    for word in rules.get("fact_words", []):
+        if _has_word(text, word) and not _has_word(why, word):
+            holds.append(f"mentions '{word}', which the why_now fact does not: open the source and check it")
+    greet = GREETING.match(body.strip())
+    name = heading.split("|", 1)[1].strip().split(",")[0].split() if "|" in heading else []
+    if greet and name and not name[0].startswith("(") and greet.group(1).lower() not in GENERIC_GREETINGS:
+        if not _same_person(greet.group(1), name[0]):
+            fails.append(f"greets '{greet.group(1)}' but the draft is for {name[0]}")
+    return fails, holds
+
+
+def check_book(f, channel, thread, book):
+    """When book/people.csv exists, the draft's person must pass that channel's gate."""
+    if book is None:
+        return []
+    pid = f.get("person_id", "")
+    row = book.get(pid)
+    if row is None:
+        return [f"person {pid} is not in book/people.csv: rebuild the book or fix the id"]
+    if channel == "email":
+        col = "send_ok" if thread == "new" else "followup_ok"
+    else:
+        col = {"call": "call_ok", "linkedin": "linkedin_ok"}.get(channel, "")
+    if col and col in row and row[col] != "yes":
+        why = row.get(col.replace("_ok", "_block_reason"), "") or row.get("send_block_reason", "")
+        return [f"book says {col} is {row[col] or 'blank'}" + (f" ({why})" if why else "")]
+    return []
+
+
+def load_book(path):
+    if not path.is_file():
+        return None
+    import csv
+    with path.open(newline="", encoding="utf-8-sig") as fh:
+        return {r.get("person_id", ""): r for r in csv.DictReader(fh)}
+
+
 def check_numbers(body, allowed_texts, where=""):
     """Every number in the message must come from used proof or the sourced fact."""
     allowed = {n.strip(".,") for t in allowed_texts for n in NUMBER.findall(t)}
@@ -221,7 +317,7 @@ def check_registry(registry):
     return fails, warns
 
 
-def lint_draft(d, rules, registry, today):
+def lint_draft(d, rules, registry, today, book=None):
     f = d["fields"]
     fails, warns = [], []
     channel = f.get("channel", "").lower()
@@ -272,6 +368,11 @@ def lint_draft(d, rules, registry, today):
     if subject:
         fails += check_banned(subject, rules, "subject ")
         fails += check_numbers(subject, allowed_numbers, "subject ")
+    truth_fails, holds = check_truth(body + " " + (subject or ""), f, d["heading"], rules, proof_ids,
+                                     allowed_numbers)
+    fails += truth_fails
+    fails += check_book(f, channel, thread, book)
+    warns += holds
     unfilled = sorted(set(VAR.findall(body + " " + (subject or ""))))
     if unfilled and status != "needs_human":
         fails.append(f"unfilled variables {unfilled} but status is not needs_human")
@@ -279,7 +380,7 @@ def lint_draft(d, rules, registry, today):
         fails.append("missing '- [ ] sent' checkbox")
     if fails:
         verdict = "FAIL"
-    elif unfilled or status == "needs_human":
+    elif unfilled or status == "needs_human" or holds:
         verdict = "NEEDS_HUMAN"
     else:
         verdict = "PASS"
@@ -391,6 +492,7 @@ def main(argv=None):
     ap.add_argument("--drafts", help="drafts Markdown file to check")
     ap.add_argument("--sequences", help="sequences.json to check")
     ap.add_argument("--today", help="YYYY-MM-DD for date checks (default: today)")
+    ap.add_argument("--book", help="prospect book for the gate check (default <workspace>/book/people.csv if it exists)")
     ap.add_argument("--report", help="also write the result as Markdown to this path")
     args = ap.parse_args(argv)
 
@@ -433,7 +535,11 @@ def main(argv=None):
         drafts = parse_drafts(text)
         if not drafts:
             raise SystemExit("no drafts found (each draft starts with '## ')")
-        draft_results = [lint_draft(d, rules, registry, today) for d in drafts]
+        book_path = Path(args.book) if args.book else ws / "book" / "people.csv"
+        book = load_book(book_path)
+        if book is None:
+            extra.append(f"no prospect book at {book_path}: the send gate was not checked")
+        draft_results = [lint_draft(d, rules, registry, today, book=book) for d in drafts]
         extra += batch_warnings(draft_results)
         results += draft_results
 

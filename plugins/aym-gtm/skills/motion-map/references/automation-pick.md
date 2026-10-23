@@ -40,11 +40,13 @@ From mechanical stages that are manual or batch, can be undone, and not high ris
 - **A stage whose readiness is unknown**: no readiness block, or no `missing` list. Unknown is never the same as ready. map.md lists these stages with three questions to answer: what can be seen today, what is missing, and what must be cleaned first.
 - **A stage that is not ready**: its `missing` list has something in it. map.md lists its cleanup.
 
-map.md says which stages were left out and why. From what is left, pick by:
+map.md says which stages were left out and why. While the map has any flow finding (G1 to G4), the pick is shown but labelled provisional: fix the flow first, rerun, then trust it.
+
+From what is left, pick by:
 
 1. lowest risk if automated wrong
 2. then where deals most often go cold (`cold_rate`)
-3. then the most minutes a week by hand (`volume_per_week` x `minutes_per_item`)
+3. then the most minutes a week by hand (`volume_per_week` x `minutes_per_item`; a stage with a `measure` block uses the weekly count from the activity log instead of an estimate)
 
 Move it up one automation level (none to observe, observe to suggest, suggest to draft), not straight to fully automatic. The script names the pick, the next in line, and the stages that need cleanup first.
 

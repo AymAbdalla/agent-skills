@@ -18,6 +18,9 @@ import sys
 from datetime import date
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from gtm_fit import fit as icp_fit  # noqa: E402  (shared ICP-fit rule, copied in four skills)
+
 DEFAULTS = {
     "icp": {
         "size": {"min": 200, "max": 2000},
@@ -141,24 +144,10 @@ def grade(score):
 
 
 def icp_reasons(account, icp):
-    reasons = []
-    size = to_int(account.get("employees"))
-    if size is not None and size < icp["size"]["min"]:
-        reasons.append("below size floor")
-    if size is not None and size > icp["size"]["max"]:
-        reasons.append("above size ceiling")
-    country = (account.get("country") or "").strip().upper()
-    if icp["countries"] and country and country not in [c.upper() for c in icp["countries"]]:
-        reasons.append(f"country {country} outside ICP")
-    industry = (account.get("industry") or "").strip().lower()
-    if industry and industry in [i.lower() for i in icp["industries_out"]]:
-        reasons.append(f"industry {industry} excluded")
-    elif industry and icp["industries_in"] and industry not in [i.lower() for i in icp["industries_in"]]:
-        reasons.append(f"industry {industry} not in ICP")
-    rel = (account.get("relationship") or "").strip().lower()
-    if rel and rel in [r.lower() for r in icp["exclude_relationships"]]:
-        reasons.append(f"account is a {rel}")
-    return reasons
+    """Known reasons an account is outside the ICP (the shared fit rule). Blank fields
+    are unknown, not out, so they never become a ticket here."""
+    verdict, reason = icp_fit(account, icp)
+    return [reason] if verdict == "out" else []
 
 
 class Audit:

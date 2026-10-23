@@ -12,6 +12,7 @@ A person may go into an email send list only when every check passes. Each setti
 | Do-not-contact notes | `clean.dnc_note_patterns` | the notes contain a phrase such as "do not contact" or "unsubscribe" |
 | Not a buyer | `not_buyer_titles` | the title matches, for example a sales rep or an intern |
 | Excluded relationship | `icp.exclude_relationships` (default competitor, customer, partner, parent_decides) | the account's relationship is in the list |
+| ICP fit | the `icp` section, through the shared fit rule | the account is outside the ICP (strategy hold), or a field the rule needs is blank: "fit unknown: enrich first" |
 | Account strategy | fixed | the account's strategy is excluded, hold, or live. A live deal belongs to its owner, so outbound stays off. |
 
 ## Email checks (`send_gate`)

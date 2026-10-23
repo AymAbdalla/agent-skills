@@ -1,6 +1,6 @@
 ---
 name: install-check
-description: Check a plugin, skill, MCP connector or hook before the user installs it, and decide download, build their own, or skip. Review mode checks what is already installed against the user's toolkit file and asks keep or remove one item at a time. Use when the user pastes an install command, a marketplace or GitHub link, or asks "should I add this?", "is this worth installing?", "add these skills", "what can I remove?" or "review my plugins". Report-only; never installs or removes.
+description: Check a plugin, skill, MCP connector or hook before the user installs it, and decide download, build their own, or skip. Review mode checks what is already installed against the user's toolkit file and asks keep or remove one item at a time. Use when the user pastes an install command, a marketplace or GitHub link, or asks "should I add this?", "is this worth installing?", "add these skills", "what can I remove?" or "review my plugins". Applies the user's own build-or-download rules as well as the general ones. Report-only; never installs or removes.
 ---
 
 # Install check

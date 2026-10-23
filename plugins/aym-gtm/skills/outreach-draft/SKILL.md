@@ -1,11 +1,11 @@
 ---
 name: outreach-draft
-description: Write outbound emails, LinkedIn notes and call reasons for chosen prospects into a dated drafts file, then check every draft with a copy checker against the copy rules, the proof registry and the sourced "why now" fact. Each draft gets a "sent" checkbox the user ticks after sending it themselves. Use when the user asks to draft outreach, write a sequence step, write first touches for scored accounts, check copy, or set up a proof registry or sequence template. Do not use to send, schedule or enroll anyone, to write into a CRM, sequencer or mailbox, to pick which accounts to work (signal-score, account-book), or to clean a list (data-quality).
+description: Write outbound emails, LinkedIn notes and call reasons for chosen prospects into a dated drafts file, then check every draft against the copy rules, the proof registry, the sourced why-now fact and the book's send gate. Each draft gets a "sent" box the user ticks after sending it themselves; recording ticked drafts appends them to log/activity.csv. Use to draft outreach, write a sequence step, check copy, or set up a proof registry or sequence template. Not for sending, enrolling, CRM or mailbox writes, picking accounts or cleaning lists.
 ---
 
 # Outreach draft
 
-Write short, true, specific messages a person can review and send. The model writes the words. The script checks them. Nothing leaves the files.
+Write short, true, specific messages a person can review and send. The model writes the words. The script checks the rules it can check: style, numbers, proof, the cited fact, words that hint at research interest, the greeting and the book's gate. It cannot prove every sentence is true, so a person still reads each draft and opens its source. Nothing leaves the files.
 
 ## If the script cannot run
 
@@ -28,6 +28,7 @@ Workspace folder (default `./gtm`):
 | `outreach/proof.json` | The proof registry. See [proof registry](references/proof-registry.md). |
 | `outreach/sequences.json` | Sequence templates. See [sequence templates](references/sequence-templates.md). |
 | Who to write to | Playable rows from `signals/scored.csv`, people with `send_ok` = `yes` (first touches) or `followup_ok` = `yes` (next step of their own sequence) in `book/people.csv`, or a list the user names. |
+| `book/people.csv` | When it exists, the checker fails any draft whose person is not cleared for that channel (`send_ok`, `followup_ok`, `call_ok` or `linkedin_ok`), or is not in the book. |
 
 If there is no proof registry, write drafts with no seller claims and offer to set one up. The checker runs without one; do not create an empty file. If there is no sequence, write first touches only.
 
@@ -47,7 +48,7 @@ If there is no proof registry, write drafts with no seller claims and offer to s
    python3 <skill-dir>/scripts/lint_copy.py --workspace <ws> --drafts <ws>/outreach/drafts/<file>.md --report <ws>/outreach/lint-report.md
    ```
    Add `--sequences <ws>/outreach/sequences.json` when you changed a template. The checker reads the subject line and the body.
-7. **Fix and recheck.** Rewrite a failing draft at most twice. Never fix a failure by adding a new claim, switching to a `SLOT` or `QUARANTINED` proof, or removing the source. If it still fails, drop it and list it in the report.
+7. **Fix and recheck.** A `NEEDS_HUMAN` draft that names a possible seller claim or a fact missing from `why_now` waits for a person to check the source; do not reword it to slip past the check. Rewrite a failing draft at most twice. Never fix a failure by adding a new claim, switching to a `SLOT` or `QUARANTINED` proof, or removing the source. If it still fails, drop it and list it in the report.
 8. **Record what was sent.** After the user sends by hand and ticks `- [x] sent`, run:
    ```
    python3 <skill-dir>/scripts/record_sent.py --workspace <ws> --drafts <ws>/outreach/drafts/<file>.md --today <YYYY-MM-DD>
@@ -57,13 +58,14 @@ If there is no proof registry, write drafts with no seller claims and offer to s
 ## Boundaries
 
 - Sending, scheduling, enrolling and CRM updates are the user's actions. Say so if asked, and stop at the drafts file.
+- The opt-out line and postal address that commercial email needs (US law applies to business email too) are added by the user's sending tool, not by these drafts. Before the first send, ask the user to confirm their sequencer adds a compliant footer.
 - A `SLOT` proof means the claim cannot be made yet. A `QUARANTINED` proof is never used.
 - Judging which angle works belongs to a later review once enough messages have gone out. Do not call an angle a winner from a handful of sends.
 
 ## Report
 
 - Drafts file path and lint report path.
-- Counts: PASS, NEEDS_HUMAN, FAIL, dropped, skipped (with reasons).
+- Counts: PASS, NEEDS_HUMAN, FAIL, dropped, skipped (with reasons). PASS means the checks passed, not that every sentence is proven true.
 - Angles used in the batch.
 - What needs the user: fill the `needs_human` gaps, open each source before the first touch, send by hand and tick `sent`.
 - What this skill did not do: send, enroll, or write to any system. Its only write outside the drafts file is appending ticked sends to the workspace activity log.

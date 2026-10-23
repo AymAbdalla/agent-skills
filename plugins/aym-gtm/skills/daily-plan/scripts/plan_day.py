@@ -53,7 +53,7 @@ DEFAULT_DAILY = {
     "recency_peak_days": [4, 14],
     "never_touched_recency": 0.8,
     "flat_gap": 0.05,
-    "fact_ladder": ["inbound_untouched", "never_touched", "buying_role", "seniority", "has_deal", "newest"],
+    "fact_ladder": ["inbound_untouched", "never_touched", "buying_role", "seniority", "newest"],
     "block_order": ["inbound", "warm", "linkedin_only", "volume"],
     "reply_lookback_days": 30,
     "owner": None,
@@ -389,6 +389,18 @@ def owner_block(ws, acct):
     return ""
 
 
+BLOCKED_ACCOUNT_STATUSES = ("live_deal", "hold", "archived")
+
+
+def account_status_block(ws, acct):
+    """'' unless the account's own status stops all outbound. Checked whatever the
+    book's strategy says: a live deal belongs to its owner."""
+    status = (acct.get("status") or "").strip()
+    if status in BLOCKED_ACCOUNT_STATUSES:
+        return f"account status is {status}"
+    return ""
+
+
 def stop_reason(ws, p, enroll, log_rows, day):
     """Why the person's sequence stops, or ''."""
     status = (p.get("status") or "").strip()
@@ -402,7 +414,7 @@ def stop_reason(ws, p, enroll, log_rows, day):
     r = lasting_stop(pid, log_rows)
     if r:
         return f"outcome {r['_outcome']} on {_when(r)}"
-    owned = owner_block(ws, ws.accounts.get(aid, {}))
+    owned = owner_block(ws, ws.accounts.get(aid, {})) or account_status_block(ws, ws.accounts.get(aid, {}))
     if owned:
         return owned
     start = parse_date(enroll.get("sequence_start")) or ws.today
@@ -439,6 +451,9 @@ def common_blocks(ws, p):
     strategy = (acct.get("strategy") or "").strip()
     if strategy in NO_OUTBOUND:
         reasons.append(f"account strategy is {strategy}")
+    status_block = account_status_block(ws, acct)
+    if status_block:
+        reasons.append(status_block)
     return reasons
 
 
@@ -650,6 +665,10 @@ def extra_cards(ws, day, taken):
         if owner_block(ws, ws.accounts.get(aid, {})):
             drop("account owned by someone else")
             continue
+        status_block = account_status_block(ws, ws.accounts.get(aid, {}))
+        if status_block:
+            drop(status_block)
+            continue
         if aid in replied_accounts:
             drop("someone at the account replied: a person handles it")
             continue
@@ -851,8 +870,13 @@ def first_action(plan):
     """One line: the first ready card you can do now, plus the first call and its time."""
     ready = [c for c in plan["cards"] if c["status"] == "ready"]
     if not ready:
-        if plan["cards"]:
+        if any(c["status"] == "needs_human" for c in plan["cards"]):
             return "Do first: fill the cards marked needs_human; nothing is ready as it is."
+        if plan["cards"] and all(c["status"] == "no_prep" for c in plan["cards"]):
+            return ("Do first: find one real reason for each no_prep card (no prep line, no dial); "
+                    "nothing is ready as it is.")
+        if plan["cards"]:
+            return "Do first: nothing is ready as it is; read the card statuses below."
         return "Do first: nothing is due today. Check plays for approvals."
 
     def label(c):
@@ -898,6 +922,19 @@ def card_md(c):
     return "\n".join(lines)
 
 
+def today_in_user_zone(root):
+    """Today's date in daily.user_timezone (the D1 stated default for a read-only plan)."""
+    tz = DEFAULT_DAILY["user_timezone"]
+    path = root / "gtm.json"
+    if path.exists():
+        try:
+            tz = (json.loads(path.read_text(encoding="utf-8")).get("daily") or {}).get("user_timezone") or tz
+        except json.JSONDecodeError:
+            pass
+    now = datetime.now(timezone.utc)
+    return (now + utc_offset(tz, now.date())).date(), tz
+
+
 def render_plan(ws, day, plan):
     cards = plan["cards"]
     off = utc_offset(ws.user_tz, day)
@@ -905,6 +942,7 @@ def render_plan(ws, day, plan):
     out = [f"# Plan for {day.isoformat()}", "",
            f"Your time zone: {ws.user_tz} (UTC{hours:+g}). Call times below are in your time zone, with the "
            "prospect's local time beside them.", "",
+           *([plan["date_note"], ""] if plan.get("date_note") else []),
            first_action(plan), "",
            f"Cards: {len(cards)} ({sum(c['kind'] == 'sequence' for c in cards)} sequence steps, "
            f"{sum(c['kind'] == 'extra' for c in cards)} extra touches). "
@@ -1095,14 +1133,19 @@ def close_day(ws, day):
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Plan today's touches from approved enrollments, or close the day.")
     ap.add_argument("--workspace", default="gtm")
-    ap.add_argument("--today", required=True, help="YYYY-MM-DD")
+    ap.add_argument("--today", help="YYYY-MM-DD (default: today in daily.user_timezone, and the plan says so)")
     mode = ap.add_mutually_exclusive_group()
     mode.add_argument("--close", action="store_true", help="close the day instead of planning it")
     mode.add_argument("--nudge", action="store_true", help="print one line: what to do first, or FAILED: why")
     args = ap.parse_args(argv)
-    day = parse_date(args.today)
-    if day is None:
-        ap.error("--today must be YYYY-MM-DD")
+    date_note = ""
+    if args.today:
+        day = parse_date(args.today)
+        if day is None:
+            ap.error("--today must be YYYY-MM-DD")
+    else:
+        day, tz = today_in_user_zone(Path(args.workspace))
+        date_note = f"No date was given, so this is the plan for today, {day.isoformat()} in {tz}."
     try:
         ws = Workspace(args.workspace, day)
         if args.nudge:
@@ -1127,6 +1170,7 @@ def main(argv=None):
             print(f"{day.isoformat()} is not a business day. Nothing planned.")
             return 0
         plan = build_plan(ws, day)
+        plan["date_note"] = date_note
         md = plan_dir / f"{day.isoformat()}.md"
         cv = plan_dir / f"{day.isoformat()}.csv"
         parked = plan_dir / f"{day.isoformat()}-unmatched.csv"

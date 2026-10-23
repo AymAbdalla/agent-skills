@@ -15,8 +15,8 @@ The Account Book shows which lanes have a contact and which do not. A missing la
 
 | Level | When |
 |---|---|
-| ready | at least `book.ready_min` (default 2) buyers pass the send gate |
-| enrich | there are buyers, but too few pass the gate |
+| ready | at least `book.ready_min` (default 2) buyers pass the send gate, including every role in `book.ready_requires_roles` (default a decision maker) |
+| enrich | there are buyers, but too few pass the gate, or no decision maker does |
 | prospect | no buyers in the book yet |
 
 ## Strategy ladder
@@ -25,19 +25,19 @@ Each account gets exactly one strategy. The rules run top to bottom, and the fir
 
 | # | Strategy | When |
 |---|---|---|
-| 0 | your override | `strategy_override` is set. It sticks until you clear it. |
 | 1 | hold | the parent company decides (relationship parent_decides) |
 | 2 | excluded | the relationship is in `icp.exclude_relationships` (default competitor, customer, partner) |
-| 2b | hold | the account is on hold, it is below the ICP size floor, or it is archived |
-| 3 | re-engage | the account is tagged `lost_deal`, or someone there is tagged `past_reply` |
-| 4 | live | a deal is open (`status` live_deal). The deal owner leads; outbound stays out. |
+| 2b | hold | the account is on hold, the shared fit rule puts it outside the ICP (size, country, industry, tech), or it is archived |
+| 3 | live | a deal is open (`status` live_deal). The deal owner leads; outbound stays out, even if someone there replied before. |
+| 3b | your override | `strategy_override` is set. It sticks until you clear it, and beats every rule below it. It never beats rules 1 to 3: the account keeps that strategy, the reason says "override … not applied", and outbound stays off. |
+| 4 | re-engage | the account is tagged `lost_deal`, or someone there is tagged `past_reply` |
 | 5 | signal | signal-score marked the account playable |
 | 6 | priority | the tier is in `book.priority_tiers` (default P1, P2) |
 | 7 | automated | nothing stronger matched |
 
-Tier and similar labels only change the sort order; they never move an account above a hold or a live deal.
+`status` is read without case or spaces, so `Live_Deal` counts as live_deal. Tier and similar labels only change the sort order; they never move an account above a hold or a live deal.
 
-Excluded, hold and live turn outbound off for everyone at the account: the send gate and the call gate both block them, and an export leaves them out with the reason.
+Excluded, hold and live turn outbound off for everyone at the account: the send gate and the call gate both block them, and an export leaves them out with the reason. An account whose fit is unknown (a blank country, industry, headcount or tech field) keeps its strategy, but every channel is blocked with "fit unknown: enrich first" until the field is filled.
 
 ## Sticky top-N
 
@@ -49,6 +49,7 @@ Excluded, hold and live turn outbound off for everyone at the account: the send 
 - one point per lane covered
 - a bonus for a tech-lane contact
 - points for a playable signal
+- ICP fit points from `ranking.fit_points` (default sweet spot 5, segment match 2, in band 0): fit is value, staffing is effort, so a great-fit account outranks a well-staffed poor fit
 
 Accounts whose relationship is in `icp.exclude_relationships`, accounts where the parent decides, and accounts on hold or excluded are never ranked.
 

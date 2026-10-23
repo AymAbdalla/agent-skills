@@ -1,6 +1,6 @@
 ---
 name: build-skill
-description: Create or revise one reusable agent skill from an agreed job, existing skill or source dissection. Use when the user asks to build a skill, improve its instructions or resources, or turn a reusable method into a skill. Do not use for ordinary app implementation, a one-off answer, or merely explaining a source.
+description: "Use whenever the user wants a reusable agent skill made or changed (\"turn this into a skill\", \"make a skill for how I...\", \"improve my X skill\"). It writes the skill's source files (SKILL.md plus references) into the user's project or plugin folder. It starts from the user's mechanics library when one exists, and leaves a design record and a structure check. Not for ordinary app code, a one-off answer, or only explaining a source."
 ---
 
 # Build skill
@@ -29,6 +29,6 @@ Create or revise only the agreed skill surface. Keep names, examples, paths and 
 
 Run `scripts/check_skill.py <skill-directory>` and inspect its scope and omissions. Passing structure is not passing behavior. Inspect generated executable code before running it within the approved test scope. Read the [evaluation guide](references/evaluation.md) for a realistic use case, negative requests, comparisons or consequential behavior.
 
-Use a fresh worker/session to follow the candidate against a supplied input. Check the actual artifact and side effects against independent expected facts. Record host/model, loaded resources, results and unavailable checks. Independent review compares settled files and evidence with the agreed scope; address findings and rerun affected checks. If independent review is unavailable, label self-review and keep that acceptance gap visible.
+When the host can start a fresh worker or session (a helper agent, a new chat), use one to follow the candidate against a supplied input. When it can't, as in a single-turn run, record the fresh-worker test as unavailable, give the exact brief and input for the user to run later, and do not call the skill tested. Check the actual artifact and side effects against independent expected facts. Record host/model, loaded resources, results and unavailable checks. Independent review compares settled files and evidence with the agreed scope; address findings and rerun affected checks. If independent review is unavailable, label self-review and keep that acceptance gap visible.
 
 Finish with changed files, selected methods, actual checks and their limits, unresolved issues and readiness state. Source complete, tested candidate, discovered skill, installed plugin and published release are separate states. A single passing case supports that case; do not claim superiority or general reliability. Installation, publishing and unrelated cleanup require their own authorization.

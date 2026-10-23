@@ -1,6 +1,6 @@
 ---
 name: test-my-knowledge
-description: "Build a source-checked practice quiz from a project, document or recent explanation, with learning objectives, scenario-based multiple-choice questions, scoring, explanations and a retest of weak areas, saved as one local HTML page and a Markdown answer key. Use when the user asks to test my knowledge, quiz me, check what I understood, or retest what I missed. Not for explaining a topic (use explain-it-my-way), grading other people, or certifying skill. Records shared results in a small learner ledger file of concepts passed or missed."
+description: "Build a source-checked practice quiz from a project, document or recent explanation, with learning objectives, scenario-based multiple-choice questions, scoring, explanations and a retest of weak areas, saved as one local HTML page and a Markdown answer key, with its editable source `quiz.json` (and `source.md` when the source was a chat explanation). Use when the user asks to test my knowledge, quiz me, check what I understood, or retest what I missed. Not for explaining a topic (use explain-it-my-way), grading other people, or certifying skill. Records shared results in a small learner ledger file of concepts passed or missed."
 ---
 
 # Test My Knowledge

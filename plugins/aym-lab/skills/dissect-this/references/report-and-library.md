@@ -22,7 +22,7 @@ Use repository-relative links for maintained artifacts and upstream URLs/stable 
 
 ## Library update
 
-When the request includes learning/extraction into the catalog, update the explicitly selected library; do not create another library home. That is `LIBRARY.md` in the library folder the user's instructions name, or `library/LIBRARY.md` in this plugin's source repository. Start a new library only when the user agrees. A standalone "explain this" request does not require catalog mutation. Keep one writer during a shared batch.
+By default a dissection adds its lessons to the selected library's catalog as `review: pending`; a plain explain request, or the user saying not to, leaves the catalog alone. Update only that selected library; do not create another library home. That is `LIBRARY.md` in the library folder the user's instructions name, or `library/LIBRARY.md` in this plugin's source repository. Start a new library only when the user agrees. Keep one writer during a shared batch.
 
 For a large campaign, inventory first and assign bounded source cohorts with exact read/write scope and an acceptance condition. Each reader records one component at a time: source ID, resolved local root, relative component path, inspection state, actual files read with hashes, and remaining scope. Distinguish a full body read, a selected implementation excerpt, an inventory-only record, an exact-source alias, and unavailable implementation. Split long reads into checked ranges; truncated output is not full coverage. Hashing a file identifies its bytes but does not prove anyone inspected its contents.
 

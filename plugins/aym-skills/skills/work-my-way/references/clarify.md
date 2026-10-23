@@ -20,7 +20,7 @@ A question that fails test 2 becomes a lookup. A question that fails test 3 beco
 - Your recommendation and the reason, tied to the user's stated goal or the project's facts.
 - What the answer unblocks.
 
-Number the questions so the user can reply by number. Do not pad the round with low-stakes questions to look thorough.
+Ask one question per message, most consequential first, and number the options so the user can reply by number. Do not pad the list with low-stakes questions to look thorough.
 
 ## Compare viable approaches
 

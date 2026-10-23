@@ -4,7 +4,7 @@ Define expected outputs and forbidden effects before the run. Use stable synthet
 
 First validate supported frontmatter and relative resources with the helper. Its result covers only its implemented subset, not every host metadata field or runtime behavior. Inspect executable helpers before authorized execution. Check an observable result independently of implementation internals; show a known failing input when it proves check sensitivity.
 
-Run a realistic positive case in a fresh context. Confirm output content, location and changed-file scope. A read/load trace establishes resource use where the host exposes one; a correct answer alone does not prove the skill loaded. Named invocation tests execution; ordinary positive and nearby-negative requests test routing separately. A host without isolated exposure capability has unavailable routing coverage.
+Run a realistic positive case in a fresh context. If no fresh context can be started here, the case is unavailable, not passed; hand the user the brief to run. Confirm output content, location and changed-file scope. A read/load trace establishes resource use where the host exposes one; a correct answer alone does not prove the skill loaded. Named invocation tests execution; ordinary positive and nearby-negative requests test routing separately. A host without isolated exposure capability has unavailable routing coverage.
 
 For comparison, hold the brief, input, tools, model within each host and grading rules constant. Use shared policy without creator instructions as a baseline. Run exact retained creators only on supported routes; label prompt-only or host adaptations separately. Preserve errors and missing coverage; an unavailable competitor cannot create a win.
 

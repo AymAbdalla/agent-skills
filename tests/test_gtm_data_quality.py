@@ -30,6 +30,54 @@ def rows(path):
         return list(csv.DictReader(fh))
 
 
+def probe_person(pid, first, last, title, email, phone, linkedin):
+    return {"person_id": pid, "account_id": "A01", "first_name": first, "last_name": last, "title": title,
+            "email": email, "email_status": "verified", "email_score": "95", "phone": phone,
+            "linkedin_url": linkedin, "country": "US", "timezone": "America/Chicago", "status": "active",
+            "last_touch_date": "", "sequence": "", "tags": "", "notes": "", "crm_id": "", "source": "crm"}
+
+
+class MatchingProbeTests(unittest.TestCase):
+    """Oct 22 review probes: a LinkedIn id link and a Rob/Robert pair with one phone."""
+
+    @classmethod
+    def setUpClass(cls):
+        cfg = clean.load_config(EXAMPLE / "gtm.json")
+        account = {"account_id": "A01", "name": "Brightmill Manufacturing", "domain": "brightmill.example",
+                   "other_domains": "", "employees": "650", "industry": "manufacturing", "country": "US",
+                   "tier": "P1", "relationship": "", "status": "active"}
+        people = [
+            probe_person("P01", "Dana", "Whitfield", "CFO", "dana.whitfield@brightmill.example",
+                         "+1-312-555-0142", "https://www.linkedin.com/in/ACwAAB12xyz"),
+            probe_person("P02", "Ann", "Lee", "VP Finance", "ann.lee@brightmill.example",
+                         "+1-312-555-0150", "https://www.linkedin.com/sales/lead/ACwAAAxyz123,NAME_SEARCH,abc"),
+            probe_person("P03", "Rob", "Whitfield", "Controller", "rob.w@brightmill.example",
+                         "+1-312-555-0144", "https://linkedin.example/in/rob-whitfield"),
+            probe_person("P04", "Robert", "Whitfield", "Controller", "robert.whitfield@brightmill.example",
+                         "(312) 555-0144", "https://linkedin.example/in/rob-whitfield"),
+        ]
+        cls.out = clean.run(cfg, people, [account], TODAY)
+        cls.where = {r["person_id"]: b for b, rs in cls.out.items() for r in rs}
+        cls.row = {r["person_id"]: r for rs in cls.out.values() for r in rs}
+
+    def test_linkedin_id_links_are_not_identity_doubt(self):
+        self.assertNotIn("profile_mismatch", self.row["P01"]["defects"])
+        self.assertNotIn("profile_mismatch", self.row["P02"]["defects"])
+        self.assertNotEqual(self.where["P01"], "enrich")
+
+    def test_a_name_slug_starting_with_ac_still_gets_the_name_check(self):
+        # Oct 22 check finding: any slug starting "ac" skipped the name check.
+        for slug in ("acosta-maria", "ackermann-john-12ab", "ACKERMANN-JOHN-12AB"):
+            self.assertFalse(clean.linkedin_id_link(f"https://www.linkedin.com/in/{slug}"), slug)
+        for slug in ("ACwAAB12xyz", "ACoAAA1b2C3d"):
+            self.assertTrue(clean.linkedin_id_link(f"https://www.linkedin.com/in/{slug}"), slug)
+
+    def test_same_phone_and_last_name_go_to_review(self):
+        self.assertEqual(self.where["P04"], "review")
+        self.assertIn("same phone", self.row["P04"]["reason"])
+        self.assertNotEqual(self.where["P03"], "review")
+
+
 class CleanListTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -54,10 +102,10 @@ class CleanListTests(unittest.TestCase):
         self.assertIn("do_not_contact", self.row["P20"]["reason"])
 
     def test_account_screens(self):
-        self.assertIn("below size floor", self.row["P23"]["reason"])
+        self.assertIn("below the size floor", self.row["P23"]["reason"])
         self.assertIn("competitor", self.row["P24"]["reason"])
         self.assertIn("customer", self.row["P28"]["reason"])
-        self.assertIn("industry excluded", self.row["P25"]["reason"])
+        self.assertIn("excluded industry", self.row["P25"]["reason"])
 
     def test_do_not_contact_beats_a_duplicate_row(self):
         # P06 and P10 share an email. If the second row is do_not_contact, neither may reach ready.

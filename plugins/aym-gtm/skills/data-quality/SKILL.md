@@ -1,6 +1,6 @@
 ---
 name: data-quality
-description: Clean a prospect list, verify it before outreach, or audit a CRM export and write fix tickets. Sorts every person into ready, later, review, enrich or quarantine with a reason; holds anything a verification file does not clearly clear; scores CRM health and orders the fixes. Writes files only. Use when the user says "clean this list", "who can I actually call", "verify these before I send", "audit my CRM", "find bad data", "dedupe these accounts" or "write the data fix tickets". Do not use to define the ICP (icp-define), build the prospect or account book (account-book), score buying signals (signal-score) or write messages (outreach-draft).
+description: Clean a prospect list, verify it before outreach, or audit a CRM export and write fix tickets. Sorts every person into ready, later, review, enrich or quarantine with a reason; holds anything a verification file does not clearly clear; scores CRM health and orders the fixes. Writes files only. Use for "clean this list", "who can I actually call", "verify these before I send", "audit my CRM", "find bad data" or "write the data fix tickets". Not for the ICP (icp-define), the book (account-book), signals (signal-score) or messages (outreach-draft).
 ---
 
 # Data quality
@@ -17,7 +17,9 @@ This skill's results come from `scripts/clean_list.py`, `scripts/verify_split.py
 - Use only data the user is allowed to keep in this workspace. Customer and employer data stays in its own environment.
 - Every threshold is an editable default in `gtm.json`, not a standard. Say so when you report one.
 - A vendor with no record of a person is not proof they left.
-- Matching goes ID, then email, then exact normalized name at the same account. Never fuzzy. A tie goes to review.
+- Matching goes ID, then email, then exact normalized name at the same account. Never fuzzy. A tie goes to review, and so do two people at one account with the same phone and last name.
+- ICP fit comes from the shared fit rule (`scripts/gtm_fit.py`, the same file icp-define, account-book and signal-score use). A known reason to be out quarantines the person; a blank account field (country, industry, headcount, tech) sends them to `enrich.csv` as "account fit unknown".
+- Account duplicates are never merged here. The audit lists them in the review queue for a person.
 - `ready` means the data is usable. It is not permission to email; account-book's send gate decides that. The account book keeps the full record and its gates block quarantined people again; nothing is copied across automatically.
 - One list of stop statuses (`stop_statuses`), opt-out tags (`dnc_tags`), left tags (`left_tags`), channel blocks (`channel_block_tags`) and personal email domains (`freemail_domains`) in `gtm.json` drives every mode.
 
@@ -48,7 +50,7 @@ If the columns differ, map them to the shared names in a copy. Never edit the us
    python3 <skill-dir>/scripts/audit_crm.py audit --workspace <ws> --sequences <ws>/input/sequences.csv --today 2026-10-20
    ```
    To try it on the bundled made-up data, use `--workspace <skill-dir>/assets/example` with an `--out` folder outside the skill, such as a temp folder.
-3. Read the outputs before reporting. Spot-check five rows from each bucket against the input: does the reason match the row? If a rule misfires for this user's market (titles, phone formats, size bands), change `gtm.json`, rerun and say what changed.
+3. Read the outputs before reporting. Spot-check five rows from each bucket against the input: does the reason match the row? If a rule misfires for this user's market (titles, phone formats, size bands), show the `gtm.json` change you propose and why, make it only after the user agrees, then rerun and say what changed.
 4. For audit mode, walk the fix plan in its order: stops, suppression fields, exclusions, bounce triage, sequences, records, enrichment last. Merges, unclear domains and double enrollments stay in the review queue for a person.
 5. Before the user submits any ticket, have them export again and run `recheck`. Only `fixes-ready.csv` goes in. Anything that drifted is re-planned, not forced.
 

@@ -38,6 +38,8 @@ The script keeps the merged source values from the last build in `book/.built/`:
 
 Accounts follow the same rules. `strategy_override`, `pain`, `pain_status`, `next_step`, `tags` and `notes` are always yours.
 
+`input/account-updates.csv` (from crm-sync) is read after `input/accounts.csv`: its non-blank `status`, `owner` and `relationship` values become source values, so your edits still win, with one exception. A row that sets `live_deal` (an open opportunity in the CRM) sets the account to `live_deal` whatever the book says. A row for an account that is not in the book is skipped with a warning.
+
 ## Time zone
 
 Use the time zone from the data. If there is none, look up the phone's area code in `book.area_code_tz` and mark it `area_code_approx`. A guessed zone is not your edit: when the phone changes, the guess follows it. A time zone you type in the book wins and is marked `manual`. The script keeps that label on later rebuilds.

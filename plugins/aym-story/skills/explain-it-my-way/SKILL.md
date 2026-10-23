@@ -1,6 +1,6 @@
 ---
 name: explain-it-my-way
-description: Explain software, product decisions, or workflows in fifth-grade plain English with illustrations and visualizations, then teach the industry terms and compare the approach with sourced professional practice. Use when the user asks to explain it my way, explain in plain English, show how something works, or explain whether an approach follows industry practice. This is an explanation skill, not a build, redesign, or audit workflow. It keeps a small learner ledger file of concepts shown, passed or missed so it does not re-teach what the user knows; the user can ask it not to track.
+description: "Use whenever the user asks how their code, project, product decision or workflow works, or why it was done that way (\"explain\", \"walk me through\", \"how does this work\", \"in plain English\"). Answering directly loses what this skill adds, which is fifth-grade plain English with a diagram, the industry terms taught afterwards, a sourced comparison with professional practice, and a learner ledger so known concepts are not re-taught (the user can turn tracking off). Not for general-knowledge questions, building, redesigning or auditing."
 ---
 
 # Explain It My Way

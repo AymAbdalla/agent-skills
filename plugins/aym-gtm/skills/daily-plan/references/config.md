@@ -23,7 +23,7 @@ Every value is an editable default, not a standard. The script uses these defaul
   "recency_peak_days": [4, 14],
   "never_touched_recency": 0.8,
   "flat_gap": 0.05,
-  "fact_ladder": ["inbound_untouched", "never_touched", "buying_role", "seniority", "has_deal", "newest"],
+  "fact_ladder": ["inbound_untouched", "never_touched", "buying_role", "seniority", "newest"],
   "block_order": ["inbound", "warm", "linkedin_only", "volume"],
   "reply_lookback_days": 30,
   "owner": null
@@ -34,7 +34,7 @@ Every value is an editable default, not a standard. The script uses these defaul
 | --- | --- |
 | `user_timezone` | Your time zone. Call blocks and your calendar are read in it. |
 | `holidays` | Dates (`YYYY-MM-DD`) that are not business days. |
-| `call_window` | Legal calling hours in the prospect's time zone. |
+| `call_window` | Default calling window in the prospect's time zone (8am to 9pm, the US federal default; some states are stricter). |
 | `preferred_window` | Hours to try first in the prospect's time zone. |
 | `call_blocks` | Your calling blocks, in your time zone. |
 | `call_slot_minutes` | Minutes per call slot. |
@@ -45,7 +45,7 @@ Every value is an editable default, not a standard. The script uses these defaul
 | `recency_peak_days` | Days since last touch that score highest. |
 | `never_touched_recency` | Recency sub-score for someone never touched. Blank is not zero. |
 | `flat_gap` | Below this spread, scores are hidden and the fact ladder orders the queue. |
-| `fact_ladder` | The order used when scores are flat. |
+| `fact_ladder` | The order used when scores are flat. An open deal is not a tie-break: live-deal accounts are never planned. |
 | `block_order` | Order of the extra-touch blocks on the page. It does not decide who gets a slot. |
 | `reply_lookback_days` | A reply anywhere at the account within this many days stops the account's sequences and extra touches. |
 | `owner` | Your name as it appears in the account `owner` column. Blank uses `play.owner`, else `you`. Accounts owned by someone else are never planned. |

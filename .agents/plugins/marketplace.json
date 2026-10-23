@@ -1,29 +1,55 @@
 {
-  "name": "aym-skills",
-  "interface": { "displayName": "Aym Skills" },
+  "name": "aymabdalla",
+  "interface": {
+    "displayName": "AymAbdalla"
+  },
   "plugins": [
     {
       "name": "aym-skills",
-      "source": { "source": "local", "path": "./plugins/aym-skills" },
-      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "source": {
+        "source": "local",
+        "path": "./plugins/aym-skills"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
       "category": "Productivity"
     },
     {
       "name": "aym-story",
-      "source": { "source": "local", "path": "./plugins/aym-story" },
-      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "source": {
+        "source": "local",
+        "path": "./plugins/aym-story"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
       "category": "Productivity"
     },
     {
       "name": "aym-lab",
-      "source": { "source": "local", "path": "./plugins/aym-lab" },
-      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "source": {
+        "source": "local",
+        "path": "./plugins/aym-lab"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
       "category": "Productivity"
     },
     {
       "name": "aym-gtm",
-      "source": { "source": "local", "path": "./plugins/aym-gtm" },
-      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "source": {
+        "source": "local",
+        "path": "./plugins/aym-gtm"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
       "category": "Productivity"
     }
   ]

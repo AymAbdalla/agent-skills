@@ -4,7 +4,7 @@
     "name": "Ayman Abdalla"
   },
   "metadata": {
-    "description": "Four plugins for AI-assisted work in Claude Code and Codex: a daily build loop that stops after every phase, explanations and write-ups, skill building, and GTM engineering on plain files."
+    "description": "Three plugins for AI-assisted work in Claude Code and Codex: a daily build loop that stops after every phase, explanations and write-ups, and skill building."
   },
   "plugins": [
     {
@@ -23,12 +23,6 @@
       "name": "aym-lab",
       "source": "./plugins/aym-lab",
       "description": "Build and improve agent skills: dissect how a system works, build a skill, pressure-test it, and capture lessons from finished work.",
-      "version": "0.5.0"
-    },
-    {
-      "name": "aym-gtm",
-      "source": "./plugins/aym-gtm",
-      "description": "GTM engineering skills: define the ICP, clean lists and audit the CRM, build the prospect and account books, score buying signals, build plays, plan the day, sync with the CRM through files, review the funnel, map the sales motion, and draft outreach to files. Vendor-neutral, never sends.",
       "version": "0.5.0"
     }
   ]

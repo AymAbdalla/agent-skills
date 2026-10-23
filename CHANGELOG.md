@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `aym-gtm` is no longer part of this collection.
+
 ## 0.5.0 (2026-10-22)
 
 - Skills stop instead of guessing. When a step says ask or confirm and nobody can answer, a skill writes nothing that depends on the answer and puts the question in its reply; a read-only report may use a default it names. Questions come one at a time.

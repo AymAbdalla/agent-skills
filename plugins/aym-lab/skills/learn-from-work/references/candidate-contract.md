@@ -56,6 +56,6 @@ A candidate starts no build. The user reviews it and may ask build-skill to make
 1. Re-compute the SHA-256 of every file in `target_files`.
 2. Compare each hash with the recorded hash. If any differs, or a listed file is missing, treat the candidate as stale. Do not draft from it.
 3. For a stale candidate, re-read the current files, reconcile the rule with what changed, and record new hashes. Proceed only after that reconciliation and with the requested approval.
-4. Verify the resulting change with a fresh behavior check and independent review, as build-skill requires.
+4. Verify the resulting change with a fresh behavior check and independent review (a fresh chat or the other tool; a helper the author starts gives only a helper review, and the author's own look is self-review), as build-skill requires.
 
 Candidate, reviewed source change and enabled installation are separate states. A saved candidate does not mean the skill changed, and a source change does not mean an installed copy changed.

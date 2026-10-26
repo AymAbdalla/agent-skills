@@ -51,3 +51,7 @@ Compute the SHA-256 of each target file from the contents you read in step 2, us
 Write one candidate file that follows the [candidate contract](references/candidate-contract.md). Read that contract before writing. Set its status to `candidate`. Do not modify the target skill, its references or any other file.
 
 Report the candidate path, the target files with their starting hashes, the rule in one sentence and the next step. That next step is the user's review, then build-skill, which must re-hash the targets and reject a stale candidate until someone re-reads and reconciles it. For a no-op, report the reason and the evidence or existing rule that supports it.
+
+## Independent check
+
+When a run is substantial (more than a quick answer: files the user will rely on, send from or share), only a fresh chat, or the other tool (Codex for Claude's work, or the reverse), counts as an independent check of its output. A helper this chat starts gives a "helper review" and this chat's own look is "self-review"; neither counts. So end by saving the output and giving the user one line to paste into a fresh chat: what to check, where it is, what it must match (the brief, the sources, the rules above), "treat this chat's report as claims to verify, not evidence", and "report only".

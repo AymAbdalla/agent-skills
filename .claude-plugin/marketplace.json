@@ -11,19 +11,19 @@
       "name": "aym-skills",
       "source": "./plugins/aym-skills",
       "description": "A daily build loop: describe the job, and work-my-way runs clarify, plan, build, check and ship one phase at a time, stopping after each.",
-      "version": "0.6.0"
+      "version": "0.6.1"
     },
     {
       "name": "aym-story",
       "source": "./plugins/aym-story",
       "description": "Turn finished work into understanding and stories: plain-English explanations, practice quizzes, blog articles and portfolio cases.",
-      "version": "0.6.0"
+      "version": "0.6.1"
     },
     {
       "name": "aym-lab",
       "source": "./plugins/aym-lab",
       "description": "Build and improve agent skills: dissect how a system works, build a skill, pressure-test it, and capture lessons from finished work.",
-      "version": "0.6.0"
+      "version": "0.6.1"
     }
   ]
 }

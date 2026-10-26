@@ -27,6 +27,6 @@ A request to dissect or propose stops at a reviewable blueprint. For implementat
 
 Resolve the maintained source repository or registered task worktree before editing. An installed plugin, cache or runtime snapshot is a distribution copy. Do not edit it as a substitute for owning source. If the source is unavailable, deliver the proposal and name the missing source; do not silently create a competing implementation.
 
-Use the available implementation method for the target. Preserve unrelated changes, review the settled change independently when required, run checks against the intended behavior and recheck the original symptom where relevant. Installation, migration, network writes, publication and sending messages retain their own authorization requirements.
+Use the available implementation method for the target. Preserve unrelated changes, review the settled change independently when required (a fresh chat or the other tool; a helper the author starts gives only a helper review, and the author's own look is self-review), run checks against the intended behavior and recheck the original symptom where relevant. Installation, migration, network writes, publication and sending messages retain their own authorization requirements.
 
 Finish with the original evidence, proposed change, executed changes, actual checks, gaps and the retained artifact. A before/after proposal is still a proposal until implementation and its checks exist.

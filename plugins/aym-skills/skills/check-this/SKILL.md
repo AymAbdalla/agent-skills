@@ -24,7 +24,7 @@ Report what holds and what doesn't, with evidence the user can trust. Follow the
 2. **Reviewed state.** Record base, committed, staged, unstaged and relevant untracked files, plus each exclusion and its reason, using [review-coverage.md](references/review-coverage.md). Uncommitted work is in scope unless the user excludes it. A category you couldn't collect is a gap, not empty.
 3. **Two tracks, kept apart.** Requirements: mark each met, partly met, missing or not checkable, with file:line or input → result. Standards: correctness, error handling, edge cases, conventions, weak or missing tests, maintainability. Give each finding a location, a severity (blocker / should fix / consider), evidence, and whether it is confirmed. When tests changed, run the test-change scan. Triage other reviewers' or bots' comments, and check a helper's review receipt, as the coverage guide describes.
 4. **Security.** Run the security pass in [security-review.md](references/security-review.md) on the change and add its result to the report.
-5. Use the report format in the coverage guide. Write in the voice of an independent reviewer; if you wrote the change in this session, label the report self-review.
+5. Use the report format in the coverage guide. Label who checked (independent, helper review or self-review, as the house rules define them); if this chat wrote the change, it is self-review.
 
 ## Verify
 

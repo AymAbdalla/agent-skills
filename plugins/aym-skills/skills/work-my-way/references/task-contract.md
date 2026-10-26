@@ -12,7 +12,7 @@ Read this for a substantial handoff, multi-session continuation or review of set
 
 ## Review the settled state
 
-Give a fresh independent reviewer the agreed requirements, repository standards, relevant artifacts and exact review scope. Inspect the base and current revision plus staged, unstaged and relevant untracked changes; a commit-only diff can omit task work. Record exclusions and whether files changed during review. Recheck affected coverage after corrections or state drift.
+Run the review in a fresh chat or the other tool (house rules, Independent checks), pointed at the agreed requirements, repository standards, relevant artifacts and exact review scope. Inspect the base and current revision plus staged, unstaged and relevant untracked changes; a commit-only diff can omit task work. Record exclusions and whether files changed during review. Recheck affected coverage after corrections or state drift.
 
 Keep two finding groups: missing or incorrect requirements, and violations of repository standards or quality expectations. A clean standards review cannot cover a missing requirement. Record each finding with evidence, its effect, correction and recheck. Record security-hook invocation and its findings separately; configured hooks alone prove no execution. An unavailable reviewer or failed check leaves a named acceptance gap. Report-only review does not authorize edits.
 

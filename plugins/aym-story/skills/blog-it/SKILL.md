@@ -140,3 +140,7 @@ In both voices keep attribution accurate. Say which decisions the founder made a
 - Plain, direct prose: active voice, concrete nouns, no filler, no em dashes. If a `stop-slop` skill is installed, apply it. Aim for 400 to 900 words before "For specialists".
 - Keep file paths, usernames and machine details inside "Evidence" so the other sections lift into a post unchanged.
 - Leave out keys, tokens, wallet addresses, account numbers and client private data.
+
+## Independent check
+
+When a run is substantial (more than a quick answer: files the user will rely on, send from or share), only a fresh chat, or the other tool (Codex for Claude's work, or the reverse), counts as an independent check of its output. A helper this chat starts gives a "helper review" and this chat's own look is "self-review"; neither counts. So end by saving the output and giving the user one line to paste into a fresh chat: what to check, where it is, what it must match (the brief, the sources, the rules above), "treat this chat's report as claims to verify, not evidence", and "report only".

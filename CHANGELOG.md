@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1 (2026-10-26)
+
+- One rule for who checks: every substantial job (code, research, writing, data, a skill) ends with its Check in a fresh chat or the other tool, labelled independent. A helper the working chat starts is labelled "helper review" and never counts as independent; the chat that did the work labels its own look self-review. check-this, the task contract, build-skill, learn-from-work and dissect-this now all say the same thing. Skills in the other plugins that end a substantial job (the GTM skills, blog-it, create-my-portfolio, test-my-knowledge, build-skill, dissect-this, learn-from-work) carry the rule in their own "Independent check" section, and "run all phases" now stops before Check. The rule applies to substantial runs only (files you'll rely on, send from or share); explain-it-my-way, install-check and pressure-test-my-skills say in one line why they need no separate check.
+
 ## 0.6.0 (2026-10-25)
 
 Independent checks you can trust, and security reviews in every phase.

@@ -17,7 +17,7 @@ Stop after each phase: clarify, plan, build, check, ship. End every phase with t
 ✔ <Phase> done — <one-line result>
 Saved: <exact path of every file written or changed, or "nothing saved">
 Needs from you: <the exact action the user must take now, or "nothing">
-Next: <next phase> (<skill>). Say "go", or tell me what to change.
+Next: <next phase> (<skill>). Say "go", or tell me what to change. (When the next phase is Check: "Next: Check, in a fresh chat (paste the line below).")
 New chat: <only at a natural break (see Fresh chats): "Good point for a fresh chat. Paste: <line>">
 ```
 
@@ -26,7 +26,7 @@ New chat: <only at a natural break (see Fresh chats): "Good point for a fresh ch
 - A small job that is one phase (a typo, a one-line fix) gets one card at the end.
 - When a phase ends blocked, the card says what is blocking and what you need, instead of "Next".
 - "Needs from you" lists only actions the user can take right now. Leave out steps that wait on your own later work.
-- If the user says "run all phases" (or "don't stop until it's done"), keep going through the phases without waiting, but still print each card as you finish it. Stop anyway before any action in "Actions that need their own yes" that they have not already named, and when a check fails.
+- If the user says "run all phases" (or "don't stop until it's done"), keep going through the phases without waiting, but still print each card as you finish it. Stop anyway before any action in "Actions that need their own yes" that they have not already named, when a check fails, and before Check: that card gives the line to paste into a fresh chat (Independent checks).
 
 ## Talk to the user
 
@@ -39,16 +39,28 @@ New chat: <only at a natural break (see Fresh chats): "Good point for a fresh ch
 - Never say something is done, fixed or working without showing the proof: the command and its result, the file and line, or the screenshot. If you could not check it, say "not checked".
 - Keep bad news at full size. Before writing a stop card or final report, list every fail, error, blocker and unchecked result. Each one must appear in the card at its original severity. Writing "mostly works" for a fail counts as leaving it out.
 
+## Independent checks
+
+Every substantial job (code, research, writing, data, a skill) gets a Check, and the Check has a label that says who did it:
+
+- **independent:** a fresh chat, or the other tool (Codex for Claude's work, or the reverse), given only pointers: paths, the plan or brief, the branch, the commands. It reads the work and the sources itself.
+- **helper review:** a helper or subagent that the working chat started and briefed. It only knows what the builder chose to tell it, so it tends to agree with the builder. Use it as a quick second look, never in place of an independent check.
+- **self-review:** the chat that did the work, checking it.
+
+Only **independent** counts. Ending a substantial job, don't start a reviewer yourself: save the work where a fresh chat can reach it (committed, and pushed when the check runs in the cloud), and give the line to paste (below). That card's Next line reads `Next: Check, in a fresh chat (paste the line below).`, never "say go" here. When the user asks for a helper reviewer, run one, and label its result helper review.
+
+Skills in other plugins can be installed without this file, so each one that ends a substantial job carries the same rule in its own "Independent check" section.
+
 ## Agent records
 
 Building work in slices uses three files in `docs/agents/`: `build.md`, `checks.md` and `status.md`. The format and the gate script live in the check-this skill: `../../check-this/references/agent-records.md` and `../../check-this/scripts/agents_gate.py`, resolved from this file's folder. Create them with `agents_gate.py init` the first time a project builds in slices.
 
 - **Builder:** at the end of each slice, the main agent writes its row in `build.md` (state `built`, results labelled `self-check:`) and its own line in `status.md`, and commits them right after the slice's code commit, so the row can name that commit. Helpers never write records. A builder never marks anything checked.
-- **Checker:** never the agent or chat that built the work. A fresh chat (or the other tool) checks a batch of 2 to 3 slices and writes only `checks.md`, in a commit of its own.
+- **Checker:** independent (see above). A fresh chat (or the other tool) checks a batch of 2 to 3 slices and writes only `checks.md`, in a commit of its own.
 - **Gate:** nothing on a branch with `docs/agents/build.md` merges until `agents_gate.py check` passes.
 - **Parallel work:** each workstream (for example Claude Code and Codex at once) gets its own git worktree, branch, plan file and test database. Before starting, read `status.md` and never take files another workstream owns. The spec is shared: an agent never edits it; it adds an open item and asks the user.
 - **Fresh chats:** these records, not the conversation, carry the state. At a natural break (a plan finished, a build ready for Check, a batch checked and merged, a switch to a different task, or signs of drift such as repeating itself or forgetting a decision), add the card's `New chat:` line with the line to paste. Leave that line out at other stops.
-- **The line to paste for Check** is always complete, so the new chat needs nothing else. Fill in this template: `Check <slices N-M | PR #N> in <repository> (branch <branch>) against <plan path> with check-this, <slice check | review and verify modes>; treat <docs/agents/build.md | the build report at <path>> as claims to verify, not evidence. Report only<, except your own checks.md rows>.` Use the slice check and the `checks.md` exception when the project has `docs/agents/`; otherwise review and verify, and "don't change files". The work must be committed on the branch first, and pushed when the check will run somewhere that can't see this folder (a cloud session). Say so on the card when it isn't. The user's context meter is the backstop: below about a quarter left, offer it at the next card.
+- **The line to paste for Check** is always complete, so the new chat needs nothing else. Fill in this template: `Check <slices N-M | PR #N | the files at <paths>> in <repository> (branch <branch>) against <plan or brief path> with check-this, <slice check | review and verify modes>; treat <docs/agents/build.md | the build report at <path>> as claims to verify, not evidence. Report only<, except your own checks.md rows>.` Use the slice check and the `checks.md` exception when the project has `docs/agents/`; otherwise review and verify, and "don't change files". The work must be committed on the branch first, and pushed when the check will run somewhere that can't see this folder (a cloud session). Say so on the card when it isn't. The user's context meter is the backstop: below about a quarter left, offer it at the next card.
 
 ## Protect the working tree
 

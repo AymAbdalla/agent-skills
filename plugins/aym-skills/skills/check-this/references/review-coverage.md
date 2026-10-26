@@ -50,7 +50,7 @@ Never repeat a comment as your own finding until you have checked it against the
 
 ## Helper review receipts
 
-When a helper wrote the review, check its receipt before you use it:
+When a helper wrote the review (a helper review, not independent), check its receipt before you use it:
 
 - the reviewed commit;
 - a files-read list that equals the changed files;
@@ -63,7 +63,7 @@ A gap means the review runs again. Never fill in the receipt yourself. If the re
 
 ```text
 Review of <repository> at <HEAD short SHA> on <branch>
-Reviewer: <independent helper | self-review by the author session>
+Reviewer: <independent (fresh chat | other tool) | helper review, briefed by the author | self-review>
 
 Reviewed state
 - Base: <ref> (merge base <SHA>) | unavailable: <reason>
@@ -95,7 +95,7 @@ Keep each finding short and specific. Write "none found" for an empty track rath
 
 ## Independence
 
-An independent review comes from a session or helper that did not write the change. When the host offers a fresh helper, give it the intent, the reviewed-state list and this format, and keep the main session as integrator. When no helper is available, the author's review is self-review and the report says so.
+Use the labels in the house rules (Independent checks). An independent review comes from a fresh chat or the other tool, given pointers, not the author's summary. A helper this session started is a helper review, however fresh it is: it saw only the brief the author wrote. When you are asked to review and you or this chat wrote the change, label it self-review and give the user the line to paste into a fresh chat.
 
 ## Applying fixes on request
 

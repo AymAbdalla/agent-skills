@@ -5,7 +5,7 @@ Three files in `docs/agents/` keep a project's work honest across chats, tools a
 | File | Who writes it | What it holds |
 | --- | --- | --- |
 | `build.md` | The builder's main agent only (never a helper, never the checker) | One row per slice it built |
-| `checks.md` | An independent checker only | One row per slice per check round |
+| `checks.md` | An independent checker only (a fresh chat or the other tool, as the house rules' Independent checks define it) | One row per slice per check round |
 | `status.md` | Each builder, its own line only | One line per workstream |
 
 Never put a `|` inside a cell: it splits the cell and the gate reads the wrong column.

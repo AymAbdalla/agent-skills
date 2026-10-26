@@ -49,3 +49,7 @@ Run `python3 scripts/grade_cases.py grade --cases <cases.json> --runs <runs.json
 For each failing check, write a finding with the case id, the check, the artifact path, the failing run ids and the command that re-grades it. Call a finding reproduced only when runs in two or more separate fixtures failed the same check; one failing run is "observed once". Write `results.md` with the target path and hash, hosts and models, allowance used, a case table, findings, unavailable coverage, protocol errors and limits.
 
 The verdict is `pass` only when every planned case ran and passed with no protocol error. Report `fail` when any case failed and `incomplete` otherwise. A pass covers these cases on these hosts; it does not establish general reliability, routing on hosts that did not run, or filesystem containment.
+
+## Independent check
+
+This skill is itself a check of another skill, so its results need no further check. It counts as independent only when it runs in a fresh chat or the other tool (Codex for Claude's work, or the reverse), not in the chat that built or changed the skill under test; there, label the results self-review.

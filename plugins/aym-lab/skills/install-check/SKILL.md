@@ -55,3 +55,7 @@ Installing is the user's action or needs their explicit yes.
 ## Review mode
 
 Use review mode to keep the toolkit small after things are installed: list what is installed, compare it with the toolkit file, check the wiring, count real use, and ask keep, remove, merge or skip one item at a time. It is report-only; the user does every removal themselves. Follow [review-mode.md](references/review-mode.md) step by step.
+
+## Independent check
+
+This skill is itself a review, so its report needs no further check.

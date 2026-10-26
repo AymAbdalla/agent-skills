@@ -1,6 +1,6 @@
 {
   "name": "aym-lab",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Build and improve agent skills: dissect how a system works, build a skill, pressure-test it, and capture lessons from finished work.",
   "author": {
     "name": "Ayman Abdalla"

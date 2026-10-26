@@ -85,3 +85,7 @@ Answer in chat by default and show the visual where the environment supports it.
 - Unless the user said not to track, did you record the terms you taught in the learner ledger?
 
 Apply these checks to meaning and behavior. A reading-level score or valid diagram syntax alone does not establish a good explanation.
+
+## Independent check
+
+Explanations are answered in the chat and read once, so they need no separate check. When an explanation is saved as a document others will rely on, end with a line to paste into a fresh chat that checks it against its sources, report only.

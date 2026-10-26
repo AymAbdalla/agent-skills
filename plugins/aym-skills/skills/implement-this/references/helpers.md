@@ -16,7 +16,7 @@ Each brief contains:
 - the exact files or directories the helper may write, and the files it may only read
 - files it must not touch, including the other helpers' surfaces
 - the checks to run and the result that counts as done
-- the authorization limits: no commit, push, install, dependency change, permission bypass or external action
+- the authorization limits: no commit, push, install, dependency change, permission bypass or external action, and no writes to `docs/agents/` (the main agent keeps the records)
 - what to return: changed files, check output, and anything it could not do
 - the standing line "stop and report if this is impossible"
 

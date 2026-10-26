@@ -21,7 +21,7 @@ Find the mechanics library: the library folder named in the user's instructions 
 
 Write a design record before building and keep it with the owning project (for example `docs/design-records/<skill>.md`): the job, the library queries you ran, the mechanic IDs selected with one reason each, the ones declined and why, and the checks planned. A skill is not done until its design record exists and matches what was built. A bounded revision updates the existing record instead of starting a new one; a typo or wording-only fix needs no record.
 
-Keep the entrypoint focused on when to select the skill and the steps that produce its result. Put optional detail in referenced files. Add scripts only for a concrete deterministic operation, assets only when required, and no empty boilerplate folders. Write everything in our own words and never copy source text, so skills carry no credit or attribution lines. Instructions cannot supply unavailable tools or prove runtime containment.
+Keep the entrypoint focused on when to select the skill and the steps that produce its result. Put optional detail in referenced files. Add scripts only for a concrete deterministic operation, assets only when required, and no empty boilerplate folders. Write everything in our own words and never copy source text. Instructions cannot supply unavailable tools or prove runtime containment.
 
 Create or revise only the agreed skill surface. Keep names, examples, paths and tool contracts consistent. Do not activate plugins, alter global policy or pause other skills as a side effect.
 

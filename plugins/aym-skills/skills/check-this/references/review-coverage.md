@@ -83,10 +83,12 @@ Requirements track
 Standards track
 | Severity | Location | Finding | Evidence | Confirmed? |
 
+Security (see security-review.md)
+| Severity | Location | Finding | Evidence | Fix |
+or: Security: no findings. Covered: <checklist items>. Ran: <commands>.
+
 Coverage gaps
 - <what was not reviewed or could not run, and its effect>
-
-Not covered by this review: security audit (see security specialist) unless a separate security review ran.
 ```
 
 Keep each finding short and specific. Write "none found" for an empty track rather than leaving it out, and say what that track covered.

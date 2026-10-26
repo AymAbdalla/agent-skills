@@ -28,10 +28,20 @@ Read the plan, spec or ticket and the current source it touches before editing. 
 
 **Fix budget.** A slice gets at most 3 tries to reach green, each with a new hypothesis. Then leave the slice open, write the tries, the exact error and the best next idea into the plan, and stop for the user. If the same slice blocks twice, go back to Plan. Never weaken a test to get green; see [good tests](references/good-tests.md).
 
+## Record each slice
+
+When the project builds in slices (it has `docs/agents/`, or the plan has more than one slice), follow the agent records in the house rules. After a slice is green, as the main agent:
+
+1. Run `python3 <check-this>/scripts/agents_gate.py init` if `docs/agents/` doesn't exist yet. `<check-this>` is this plugin's `check-this` skill folder, next to this one.
+2. Commit the slice's code on the feature branch (the standing permission in the house rules; never on `main`, never push).
+3. Add a row to `docs/agents/build.md`: the slice, workstream, branch, the commit from step 2, the acceptance checks copied from the plan, your results starting with `self-check:`, state `built` (or `fixed (round N)` after a failed check), and the date. Update your own line in `docs/agents/status.md`. Commit both. Never write `checked`, `pass` or `verified` as the state, and never touch `checks.md`.
+
+Helpers return reports; only you write the records. After 2 to 3 slices, or at the end of the plan, stop: the card offers Check in a fresh chat with the line to paste.
+
 ## Helpers only for independent parts
 
 Use a helper when parts touch separate files with no blockers between them and parallel work saves real time. Give each helper one write surface, and never give two writers the same file. Read [helpers](references/helpers.md) first. You integrate the results, read the combined diff and rerun the checks yourself.
 
 ## Finish
 
-Run the plan's acceptance checks and the project's normal test command on the integrated result. Remove temporary scaffolding. Report the changed files, each check with its state, each test with the requirement its expected value came from, deviations from the plan, open decisions, and anything not run or left untested. End with the stop card: next is Check (`check-this`). Commit, push and PR belong to Ship.
+Run the plan's acceptance checks and the project's normal test command on the integrated result. Remove temporary scaffolding. Report the changed files, each check with its state, each test with the requirement its expected value came from, deviations from the plan, open decisions, and anything not run or left untested. End with the stop card: next is Check (`check-this`) in a fresh chat, with the line to paste filled in from the house rules' Check template (what to check, repository, branch, plan, what counts as claims, report only). Slice commits on the feature branch are part of recording each slice; push, PR and merge belong to Ship.

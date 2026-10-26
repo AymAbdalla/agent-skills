@@ -33,11 +33,11 @@ Run the project's relevant checks against the files you will commit, after the l
 
 ## Commit
 
-1. Check who the commit will be authored by: read `git config user.name` and `git config user.email`. If either is an AI or tool name (for example Claude, Codex, an assistant or a bot) and the project or the user bans AI attribution, stop and ask which identity to use. With the user's answer, set it for this commit only (`git -c user.name=... -c user.email=... commit ...`). Never change git config without a yes.
+1. Commit as the identity the user's or project's instructions name, passed for this commit only (`git -c user.name=... -c user.email=... commit ...`). If none is named, show the user the identity from `git config user.name` and `user.email` and ask whether to commit as it before the first commit of the session; the session may set its own. Never change git config without a yes.
 2. Stage only the related files by name. Never use `git add -A`, `git add .` or `git commit -a`.
 3. Write the message to a file in the session's task scratch folder (the host temp area if none): an imperative subject that names the outcome, then a short body when the reason is not obvious. Match the project's message conventions and any required trailers. Describe only what the staged diff contains.
 4. Commit with an explicit pathspec so other staged files stay out: `git commit -F <message-file> -- <file> ...`.
-5. Read back: `git show --stat HEAD` must list exactly the selected files and the author you checked in step 1; `git status --short` must still show the unrelated paths. Then delete the message file.
+5. Read back: `git show --stat HEAD` must list exactly the selected files and the author from step 1; `git status --short` must still show the unrelated paths. Then delete the message file.
 6. Do not amend, rebase or squash commits that already exist on a remote unless the user asks.
 
 ## Sync, only when requested
@@ -49,8 +49,12 @@ Run the project's relevant checks against the files you will commit, after the l
 ## Merge, only when the user says "merge"
 
 1. Prefer the host's PR merge (for example `gh pr merge <n> --merge`, or the repo's usual method) when a PR exists. With no PR, merge locally: update the base branch from its upstream, `git merge --no-ff <branch>`, rerun the project's checks on the merged result, then push the base.
-2. Before merging, confirm checks passed on the exact content and the PR or branch has no conflicts. A failing check or a conflict stops the merge; report it.
+2. Before merging, confirm checks passed on the exact content and the PR or branch has no conflicts. When the branch has `docs/agents/build.md`, also run `python3 <check-this>/scripts/agents_gate.py check --base <base branch>` (`<check-this>` is this plugin's `check-this` skill folder) and quote its output. Without `docs/agents/`, confirm that a check on this exact commit included a security pass with no blocker or should-fix open; if none did, say so and ask before merging. A failing check, a refused gate or a conflict stops the merge; report it and name the slices the gate lists.
 3. After merging, confirm the base branch on the remote contains the merge (`git ls-remote` against the local base). Do not delete branches unless asked.
+
+## Slice commits on a feature branch
+
+The house rules give one standing permission: a finished slice (its code and its `docs/agents/` records) may be committed on its own feature branch without asking. The steps under Commit still apply. It never covers `main` or the default branch, a push, a PR or a merge.
 
 ## Push and PR, only when requested
 

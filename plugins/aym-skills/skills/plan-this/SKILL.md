@@ -27,7 +27,7 @@ Stop early if behavior is not agreed: list the open choices that change what get
 ## Plan mode
 
 1. **Starting point.** Read the agreed behavior, the project instructions, the code areas the work touches and the existing tests. Look for an existing plan (in the plans location, the path the user named, and any plan the spec links). If an approved plan already covers the work, point to it and stop. Update an unapproved draft in place. Never write a second plan beside one.
-2. **Write the plan** where the user asked, or in the project's plans location, using [plan-shape.md](references/plan-shape.md): goal and source of agreement; slices (thin end-to-end paths, each with one observable acceptance check, ordered by real blockers); real dependencies (exists now? who provides? what the check does if missing; no secret values); verification (each requirement mapped to a check); risks, open decisions and fog; an editable Mermaid flow; and the approval request. No ticket quotas, task counts or time estimates unless asked. When the plan adds a scheduled, repeating or self-running job, apply the [loop check](references/loop-check.md) and put its answers in the plan.
+2. **Write the plan** where the user asked, or in the project's plans location, using [plan-shape.md](references/plan-shape.md): goal and source of agreement; slices (thin end-to-end paths, each with one observable acceptance check, ordered by real blockers); real dependencies (exists now? who provides? what the check does if missing; no secret values); verification (each requirement mapped to a check); security (a short threat model, or "None:" with the reason); risks, open decisions and fog; an editable Mermaid flow; and the approval request. No ticket quotas, task counts or time estimates unless asked. When the plan adds a scheduled, repeating or self-running job, apply the [loop check](references/loop-check.md) and put its answers in the plan.
 3. **Confirm** the file is saved where you said.
 
 ## Review mode
@@ -40,4 +40,4 @@ Report only, unless the user asks you to edit the plan. If asked to implement it
 
 ## Stop
 
-End with the stop card. Spec → next is Plan. Plan → "Approve this plan?", then Build. Review → "Accept which findings?" Approving a plan covers its scope only.
+End with the stop card. Spec → next is Plan. Plan → "Approve this plan?", then Build. A finished plan is a natural break, so the Plan card always adds the `New chat:` line from the house rules, with a line to paste that starts Build from the plan file once it is approved. Review → "Accept which findings?" Approving a plan covers its scope only.

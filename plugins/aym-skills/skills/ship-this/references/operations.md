@@ -24,7 +24,7 @@ Build the body from `git diff <base>...HEAD --stat`, the commit messages and the
 
 ## Author identity
 
-The machine's git identity can belong to a tool rather than the user (cloud sessions often set `user.name` to the assistant's name). A clean message is not enough: the author field also lands in history. When the user's own name and email are recorded in their instructions, propose those; otherwise ask. Pass the identity per command with `git -c`, so the machine's config stays unchanged. If an existing unpushed commit already carries the wrong author, report it and ask before amending.
+Use the identity the user's or project's instructions name, passed per command with `git -c`, so the machine's config stays unchanged. With none named, confirm the configured identity with the user before the session's first commit, as Commit step 1 says. If an existing unpushed commit carries the wrong author, report it and ask before amending.
 
 ## Hooks
 

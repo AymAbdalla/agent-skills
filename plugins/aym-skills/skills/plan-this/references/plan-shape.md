@@ -1,6 +1,6 @@
 # Plan shape
 
-Use this when writing a plan document. Scale it to the work: a two-slice change can fit on one screen. Leave a section out only when it has nothing to say, and say so in one line. Flow and Approval are always required.
+Use this when writing a plan document. Scale it to the work: a two-slice change can fit on one screen. Leave a section out only when it has nothing to say, and say so in one line. Security, Flow and Approval are always required.
 
 ## Section list
 
@@ -23,6 +23,9 @@ Status: proposed, awaiting approval. Source of agreement: <spec path or decision
 ## Verification
 | Requirement | Check | Runs now? |
 | --- | --- | --- |
+
+## Security
+<What is worth stealing or breaking, who can reach it, and what stops them. Or: "None: <why>".>
 
 ## Risks, open decisions and fog
 - Open decision: <choice> (needs <who>)
@@ -50,6 +53,16 @@ Status: proposed, awaiting approval. Source of agreement: <spec path or decision
 Real dependencies are things outside the code being written: an external API or webhook, an account or credential, a dataset, a CLI or service that must be installed, a teammate's decision, another feature. Check the repository and environment for each one. When a dependency is missing, the plan says who can provide it and what the check does until then, for example a recorded sample payload, a local stub with the real contract, or a check marked "cannot run until provisioned". A stub check does not prove the real integration.
 
 Never write secret values into the plan. Name the environment variable or secret store instead.
+
+## Security section
+
+A short threat model, scaled to the work. Answer three questions about what the plan adds or changes:
+
+1. **What is worth protecting?** Secrets (API keys, tokens), personal or private data, money, accounts, the ability to run commands or send messages.
+2. **Who can reach it, and how?** Users, anyone on the internet, a webhook, a file or page an agent reads, a dependency.
+3. **What stops misuse?** Where the secret is kept (name the environment variable or store, never the value), the login or permission check, input checks, the human approval step.
+
+When the work touches none of these (prose, a rename, a local script with no outside input), write "None:" and the reason in one line. Each real risk gets a slice's acceptance check or a line in Risks.
 
 ## Mermaid guidance
 

@@ -32,7 +32,7 @@ When the request names no phase, start at the earliest one that is not settled y
 ## Size the job
 
 - **Small and clear:** a typo, a rename with no callers, a one-line fix with an obvious check. Do it, run the check, and end with one card. No interview, no plan document.
-- **Substantial:** follow the phases in order (Clarify → Plan → Build → Check → Ship) and stop after each. Build needs an approved plan. Approval covers the plan's scope; a material change needs the user's decision again.
+- **Substantial:** follow the phases in order (Clarify → Plan → Build → Check → Ship) and stop after each. Build needs an approved plan. Approval covers the plan's scope; a material change needs the user's decision again. When the work is built in slices, keep the agent records the house rules describe. Check always runs in a fresh chat, not in the one that built the work: the Build card's Next line names Check in a new chat and gives the line to paste, for example `Read AGENTS.md and docs/agents/, then check slices 1-3 with check-this.`
 - **Research, writing or review:** run that job, verify it by its own standard, and stop.
 
 For multi-session work, a substantial handoff or a review of settled changes, read the [task contract](references/task-contract.md) and carry its fields in the project's existing documents.

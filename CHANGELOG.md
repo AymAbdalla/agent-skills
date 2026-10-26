@@ -1,8 +1,30 @@
 # Changelog
 
-## Unreleased
+## 0.6.0 (2026-10-25)
 
+Independent checks you can trust, and security reviews in every phase.
+
+### New
+
+- **Builder and checker records.** Work built in slices keeps three files in `docs/agents/`: `build.md` (the builder's own rows, always labelled self-check), `checks.md` (written only by an independent checker in a fresh chat or another tool, against an exact commit) and `status.md` (one line per workstream).
+- **A merge gate.** `check-this/scripts/agents_gate.py check` refuses a merge while a slice has no independent pass, a pass is for older code, a check was committed together with other files, a builder row claims more than `built`, or the branch changed code without a passing security check. `ship-this` runs it before every merge.
+- **Security reviews in every phase.** Every `check-this` mode runs an 8-point security pass (secrets, injection, logins and permissions, outside input, dependencies, data exposure, settings, AI and agent risks) and reports findings with file and line, or "no findings" with what it covered. Every plan gets a Security section, a short list of what could go wrong. The house rules gain five secure-coding rules.
+- **A paste-back block.** A check that finds problems ends with a numbered "Paste into the build chat" block (file, line, what's wrong, suggested fix), and "recheck" runs the same check on the new commit.
+- **Fresh-chat prompts.** The stop card gains a `New chat:` line at natural breaks, with a complete line to paste, so long sessions move to a fresh chat without losing state.
+- **Parallel work rules.** Claude Code and Codex can build at once: one worktree, branch, plan file and test database per workstream, and `status.md` says who owns which files.
+- **A security policy.** The repository ships a `SECURITY.md` that says how to report a problem privately.
+
+### Changed
+
+- An independent check never fixes the work it checks, even when asked; it sends the fixes back to the build chat. Fixes stay available for a plain review of your own file and for simplify.
+- Agents may commit finished slices on their own feature branch without asking; committing to `main`, pushing and merging still need a yes.
+- `ship-this` commits as the identity your instructions name, and confirms the configured identity before a session's first commit when none is named.
+- AI-attribution rules are out of the skills; they belong in your own personal and project instructions.
 - `aym-gtm` is no longer part of this collection.
+
+### Upgrading
+
+Projects that already use agent records need one security check recorded in `checks.md` before their next merge, or the gate refuses it.
 
 ## 0.5.0 (2026-10-22)
 
